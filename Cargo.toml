@@ -1,0 +1,35 @@
+[workspace]
+members = ["crates/event-bus"]
+resolver = "2"
+
+[package]
+name = "simple-proxy"
+version = "2.0.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "A minimalist Layer-4 TCP forwarder (Rust + Tokio)"
+authors = ["Eric Law"]
+
+[[bin]]
+name = "simple-proxy"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "time",
+    "process",
+    "signal",
+    "sync",
+    "macros",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -18,3 +18,7 @@
 .aider.chat.history.md
 .aider.input.history
 .aider.tags.cache*
+
+# === Rust ===
+# Build artifacts. Cargo.lock is intentionally committed (this is an application).
+/target

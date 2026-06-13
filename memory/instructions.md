@@ -2,45 +2,55 @@
 
 ## What This Project Is
 
-A small, **zero-dependency TCP socket proxy** for Node.js. It was originally built
-to let a user SSH into a Multipass Ubuntu VM from the host machine (or the Internet),
-then generalized into a generic socket proxy that does NAT-style forwarding from a
-host port to a guest-VM target IP and port. A companion CLI, `port-forward.js`,
-forwards a single `source_ip:port → target_ip:port` pair for local VM work
-(reaching Docker/Kubernetes services running inside a laptop VM from the host OS).
+A small, **minimalist Layer-4 raw TCP forwarder** written in Rust + Tokio. It was
+originally built to let a user SSH into a Multipass Ubuntu VM from the host machine (or
+the Internet), then generalized into a socket proxy that does NAT-style forwarding from
+a host port to a guest-VM target IP and port. Because it works at Layer 4, it is
+protocol-agnostic (SSH/HTTP/HTTPS pass through as raw bytes). nginx is inspiration only
+— it is **not** an HTTP/L7 proxy.
 
-**Type:** CLI / utility tool (long-running daemon + one-shot CLI)
-**Primary language:** JavaScript (Node.js, CommonJS) — verified on Node v22.12.0
-**Framework / stack:** Node.js standard library only — `net`, `child_process`,
-`crypto`, `fs`, `path`, `process`, `Intl.NumberFormat`. No external dependencies.
+It was rewritten from the original Node.js implementation to Rust + Tokio in **v2.0.0**
+(2026-06-13). The on-disk JSON config schema was preserved for back-compat.
+
+**Type:** CLI / utility tool (long-running daemon + one-shot CLI), single binary.
+**Primary language:** Rust (edition 2021) — built with cargo 1.95.
+**Stack:** Tokio async runtime; `serde`/`serde_json` (config); `anyhow` (errors). No
+HTTP/proxy framework — raw `tokio::net` sockets. The separate `event-bus` crate uses `flume`.
 
 ## Repository Structure
 
-Flat single-package layout (no `src/`):
+Cargo **workspace** — the `simple-proxy` binary/lib at the repo root, plus a standalone
+`event-bus` crate under `crates/`:
 
-- `simple-proxy.js` — config-driven proxy daemon. Discovers the target VM IP by
-  running a shell command from the config, then forwards each configured
-  `source_ports[i] → targetIp:target_ports[i]` pair. Intended to run under PM2 or
-  docker-compose.
-- `port-forward.js` — standalone CLI: `node port-forward.js source_ip:port target_ip:port`.
-  One static port pair; **no IP allow-list** (a local-dev convenience tool).
-- `proxy-config.json` — the active config read by `simple-proxy.js`.
-  `proxy-config-multipass.json` and `proxy-config-hyperv.json` are sample variants
-  (Multipass `ifconfig` discovery vs. Hyper-V `arp -a` discovery).
-- `package.json` — metadata; zero dependencies; no real build/test scripts.
-- `README.md`, `LICENSE` (Apache-2.0).
+- `Cargo.toml` — package `simple-proxy` v2.0.0; deps tokio/serde/serde_json/anyhow.
+- `src/main.rs` — thin CLI shell: dispatch, register signals once, run.
+- `src/lib.rs` — re-exports the modules (so integration tests can drive them).
+- `src/cli.rs` — hand-rolled arg parser → `serve` / `forward` subcommands.
+- `src/config.rs` — serde config model + JSON load + validation.
+- `src/discovery.rs` — async shell-command target-IP discovery + pure parser.
+- `src/allowlist.rs` — exact + `x.y.z.*` IP allow-list (IPv4-mapped-IPv6 aware).
+- `src/relay.rs` — the core bidirectional relay (idle-reset timeout, half-close, byte counters).
+- `src/proxy.rs` — bind/accept loop, allow-list gate, upstream connect + restart, conn counter.
+- `src/shutdown.rs` — `tokio::sync::watch` shutdown signal.
+- `src/log.rs` — UTC-timestamped logger + INSTANCE_ID/session id + thousands grouping.
+- `tests/integration.rs` — in-process echo round-trip / reject / idle / shutdown.
+- `crates/event-bus/` — standalone reusable named-route event bus crate (flume; `Vec<u8>`
+  payloads; broadcast + work-queue). NOT a dependency of the proxy; prep for a larger
+  project. Lib at `src/lib.rs`, demo at `examples/event_bus_demo.rs`
+  (`cargo run -p event-bus --example event_bus_demo`).
+- `proxy-config.json` (active) + `proxy-config-multipass.json` / `-hyperv.json` (samples).
+- `README.md`, `CHANGELOG.md`, `LICENSE` (Apache-2.0).
 
 ## Conventions Observed
 
-- CommonJS (`require`) with capitalized module aliases (`Net`, `Crypto`, `Fs`,
-  `Path`, `Shell`).
-- Logging goes through a local `consoleLog` helper formatted as
-  `<local timestamp> [INSTANCE_ID] <message>`, where `INSTANCE_ID` is a random
-  4-digit per-process id and each connection gets a random 6-digit `sessionId`.
-- Legacy ES5 idioms throughout — `var`, loose `==`, and `for (key in array)`.
-  These are intentional refactor targets (see `continuity.md` → Open Threads), not
-  patterns to imitate in new code.
-- The two `.js` files run directly under Node; there is no bundler or transpile step.
+- Idiomatic async Rust; one `select!`-loop relay over borrowing `TcpStream::split()`,
+  reset-on-activity idle via `tokio::time::timeout` per read, TCP half-close on EOF.
+- Logging via the `logln!` macro → `<UTC timestamp> [INSTANCE_ID] <message>`. UTC
+  (not local) by design; full line built then a single `println!` for atomicity.
+- Errors: `anyhow::Result` at the binary edges; per-connection failures are logged and
+  contained (never abort the daemon). Typed `io::ErrorKind` matching (not error strings).
+- Keep it minimal: explicit tokio feature flags (not `"full"`); no clap, no chrono.
+- Run directly via `cargo run -- <subcommand>`; no codegen/build script.
 
 ## Tone & Style
 
@@ -60,14 +70,15 @@ Flat single-package layout (no `src/`):
 
 ## Testing
 
-None. `npm test` is a placeholder that prints an error and exits 1. Verification is
-manual: start the proxy and connect through it. A minimal smoke test is a candidate
-once the code is refactored (see Open Threads).
+`cargo test` — unit tests live in each module's `#[cfg(test)]`, plus
+`tests/integration.rs` drives the real accept loop + relay against an in-process echo
+server. Also gate on `cargo fmt --check` and `cargo clippy --all-targets`. Manual
+end-to-end: run an upstream, `simple-proxy forward …` (or `serve`), and `curl` through it.
 
 ## CI / CD
 
-None. No `.github/workflows/`, CI config, or `Dockerfile`/`docker-compose.yml` are
-committed, although the README recommends PM2 or docker-compose for deployment.
+None committed. No `.github/workflows/` or `Dockerfile`/`docker-compose.yml`, though the
+README recommends systemd or docker-compose for deployment.
 
 ## Editing These Instructions
 

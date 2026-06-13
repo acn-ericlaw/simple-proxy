@@ -13,89 +13,100 @@
 ## Project State
 
 - **project:** simple-proxy
-- **status:** AI-enabled 2026-06-13 (fresh enable); stable at v1.2.0, refactor planned
+- **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
 - **last_enabled:** 2026-06-13
-- **last_session:** (none yet)
+- **last_session:** 2026-06-13 (Claude Code)
 - **last_review:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
 
 ## Stack & Tools
 
-- **language:** JavaScript (Node.js, CommonJS) — verified on Node v22.12.0
-- **runtime deps:** none — Node.js standard library only (`net`, `child_process`, `crypto`, `fs`, `path`, `process`, `Intl`)
-- **version:** 1.2.0 (source of truth: `package.json`; `simple-proxy.js` APP_NAME agrees — no drift)
-- **entry points:** `simple-proxy.js` (config-driven daemon), `port-forward.js` (CLI)
-- **deploy:** PM2 (`pm2 start simple-proxy.js`) or docker-compose
+- **language:** Rust (edition 2021) — built with cargo 1.95
+- **runtime deps:** proxy — tokio (rt-multi-thread/net/io-util/time/process/signal/sync/macros), serde + serde_json, anyhow. `event-bus` crate — flume (+ tokio dev-only for its example/test)
+- **version:** 2.0.0 (source of truth: `Cargo.toml`)
+- **entry points:** single binary `simple-proxy` with `serve` (daemon) and `forward` (one-shot) subcommands
+- **deploy:** a process manager (e.g. systemd, `Restart=on-failure`) or docker-compose, paired with the `restart` config key
 - **remote:** GitHub `acn-ericlaw/simple-proxy`
 
 ## Architectural Invariants
 
 > Hard constraints that must never change. These never decay (treated as `core`).
 
-- Zero runtime dependencies — Node.js standard library only. Simplicity and
-  performance are the project's whole value proposition; keep `package.json`
-  dependencies empty.
-  <!-- id: zero-runtime-deps | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
-- `simple-proxy.js` gates every inbound connection through the `authorized` IP
-  allow-list (exact match or `x.y.z.*` prefix); unauthorized remotes are destroyed
-  before any data is forwarded.
-  <!-- id: authorized-ip-allowlist | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
+- Layer-4 raw TCP forwarder only — protocol-agnostic (SSH/HTTP/HTTPS pass through as
+  bytes). nginx is inspiration only; do NOT turn this into an HTTP/L7 proxy.
+  <!-- id: layer-4-only | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
+- Minimal dependency footprint — the proxy uses Tokio + serde + anyhow only (explicit
+  tokio features, never `"full"`; no clap, no chrono). `flume` lives in the separate
+  `event-bus` workspace crate, so the proxy binary links none of it. Minimalism is core.
+  <!-- id: minimal-deps | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
+- `serve` gates every inbound connection through the `authorized` IP allow-list (exact
+  match or `x.y.z.*` prefix); unauthorized remotes are dropped before any data is
+  forwarded. (`forward` mode has no allow-list by design.)
+  <!-- id: authorized-ip-allowlist | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: core -->
 
 ## Key Decisions
 
-- Two entry points by design: `simple-proxy.js` (config file, dynamic VM-IP
-  discovery via a shell command, multiple port pairs, IP allow-list, restart-on-dead-
-  target) vs. `port-forward.js` (CLI args, one static port pair, no allow-list — a
-  local-dev convenience).
-  <!-- id: two-entry-points | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- 30-minute idle timeout (`IDLE_TIMEOUT = 1800 * 1000`) on each client socket.
+- One binary, two subcommands: `serve` (config file, optional shell-command target-IP
+  discovery OR static `target_ip`, multiple port pairs, IP allow-list, restart-on-dead-
+  target) vs. `forward` (CLI args, one static pair, no allow-list — local-dev convenience).
+  <!-- id: two-subcommands | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+- Config `discovery` block is optional; omit it and set a static `target_ip`. Existing
+  JSON schema (plural `source_ports`/`target_ports`, `authorized`, `restart`) preserved.
+  <!-- id: optional-discovery | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+- Core relay: a single `tokio::select!` loop over borrowing `TcpStream::split()`, each
+  read wrapped in `tokio::time::timeout(idle, ..)` for reset-on-activity idle, with TCP
+  half-close on EOF and rx/tx byte counters. (Not `copy_bidirectional` — it can't idle-reset.)
+  <!-- id: relay-design | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+- Idle timeout default 1800s (30 min), configurable via `idle_timeout_secs`.
   <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- Auto-restart hook: in `simple-proxy.js`, if a target equals the configured
-  `restart` port and the connection times out (`ETIMEDOUT`), the process `exit(1)`s
-  so the process manager (PM2/docker) restarts it.
-  <!-- id: restart-on-etimedout | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- Graceful shutdown on SIGTERM/SIGINT: ends tracked connections, then closes the
-  server.
-  <!-- id: graceful-shutdown | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+- Auto-restart hook: a connect timeout to the configured `restart` target port triggers
+  `process::exit(1)` so a process manager (systemd/docker) restarts. Detected via typed `io::ErrorKind::TimedOut`
+  + a bounded connect timeout (not a locale-fragile error-string match).
+  <!-- id: restart-on-timeout | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+- Graceful shutdown via a single `tokio::sync::watch` channel; SIGTERM/SIGINT registered
+  ONCE process-wide and fanned out (fixes the JS per-port duplicate-handler bug).
+  <!-- id: graceful-shutdown | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
+- `event-bus` crate (`crates/event-bus/`) — a standalone, reusable named-route event bus
+  on flume: `Vec<u8>` payloads; broadcast pub/sub (`subscribe`) AND work-queue (`worker`)
+  delivery that can coexist per route; `publish` is sync/non-blocking. Its own workspace
+  crate so the `simple-proxy` binary links no flume; deliberately NOT in the proxy data
+  path (the byte relay stays direct) — preparation for a larger event-bus project. Demo:
+  `cargo run -p event-bus --example event_bus_demo`. Modeled on
+  `~/sandbox/rust/rust_event_bus_example` but generalized (bytes, both delivery modes).
+  <!-- id: event-bus-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
 
 ## Conventions
 
-- CommonJS, capitalized module aliases, timestamped `consoleLog` with random
-  per-process `INSTANCE_ID` and per-connection 6-digit `sessionId`.
-  <!-- id: logging-convention | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- Legacy ES5 style (`var`, `==`, `for..in`) — slated for refactor, not to be
-  imitated in new code.
-  <!-- id: legacy-es5-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+- `logln!` macro → `<UTC timestamp> [INSTANCE_ID] <message>`; random per-process
+  `INSTANCE_ID` (4-digit) + per-connection `sessionId` (6-digit). Logs are UTC by design
+  (the JS version logged local time). Build the full line, then one `println!`.
+  <!-- id: logging-convention | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
+- Idiomatic async Rust; `anyhow::Result` at the edges, per-connection errors contained;
+  typed `io::ErrorKind` matching. Gate on `cargo fmt --check` + `cargo clippy`.
+  <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
 
 ## Open Threads
 
-> Surfaced during the enable analysis on 2026-06-13. These are the refactor backlog.
-> Source code was **not** modified during enablement.
+> The v2.0.0 Rust rewrite (2026-06-13) resolved the entire JS-era refactor backlog below.
 
-- [ ] `package.json` `"main"` points to `socket-proxy.js`, which does not exist —
-  the real entry points are `simple-proxy.js` / `port-forward.js`. Fix or remove.
+- [x] `package.json` `"main"` pointed to a non-existent `socket-proxy.js`. Resolved:
+  `package.json` removed (now a Cargo project).
   <!-- id: ot-package-main-wrong | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] README "Library dependencies" tells users to `npm install` the `moment`
-  package, but `package.json` has no dependencies and the code uses a custom
-  timestamp helper (no moment). README is stale.
+- [x] README "Library dependencies" told users to `npm install moment` (stale). Resolved:
+  README rewritten for the Rust tool.
   <!-- id: ot-readme-moment-stale | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] README's `proxy-config.json` example uses singular `source_port`/`target_port`
-  and omits `restart`, but the code and shipped config files use plural
-  `source_ports`/`target_ports` plus `restart`. Align the README with the real schema.
+- [x] README config example used singular `source_port`/`target_port`. Resolved: README
+  now documents the real plural `source_ports`/`target_ports` schema.
   <!-- id: ot-readme-config-keys-mismatch | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] Code-quality refactor: `var` → `const`/`let`; `for (i in array)` leaks an
-  implicit global `i` and iterates index strings — use `for...of`; loose `==` → `===`.
+- [x] Legacy ES5 idioms (`var`, `==`, `for..in`). Resolved: rewritten in Rust.
   <!-- id: ot-modernize-es | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] Large duplication between `simple-proxy.js` and `port-forward.js`
-  (`consoleLog`, `getLocalTimestamp`, `forwardPort`, graceful-shutdown) — extract a
-  shared module.
+- [x] Code duplication between the two `.js` files. Resolved: shared `relay`/`log`/etc.
+  modules in one crate.
   <!-- id: ot-extract-shared-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] SIGTERM/SIGINT handlers are registered *inside* `forwardPort`, so when
-  `simple-proxy.js` forwards multiple ports it attaches duplicate process-level signal
-  listeners (one per port). Hoist to a single registration.
+- [x] Duplicate SIGTERM/SIGINT handlers (one per forwarded port). Resolved: signals
+  registered once, fanned out via the shutdown channel.
   <!-- id: ot-duplicate-signal-handlers | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
-- [ ] No tests; `npm test` deliberately errors. Add a minimal smoke test once the
-  code is refactored.
+- [x] No tests. Resolved: `cargo test` unit + integration suite added.
   <!-- id: ot-no-tests | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
 
 ## User Preferences

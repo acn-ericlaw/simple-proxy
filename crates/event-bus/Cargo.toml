@@ -1,0 +1,14 @@
+[package]
+name = "event-bus"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "A general-purpose named-route event bus (broadcast + work-queue) on flume"
+authors = ["Eric Law"]
+
+[dependencies]
+flume = "0.11"
+
+[dev-dependencies]
+# Only the example and the async test need a runtime; the library itself does not.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
