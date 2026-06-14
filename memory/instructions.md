@@ -17,6 +17,9 @@ It was rewritten from the original Node.js implementation to Rust + Tokio in **v
 **Stack:** Tokio async runtime; `serde`/`serde_json` (config); `anyhow` (errors). No
 HTTP/proxy framework — raw `tokio::net` sockets. The separate `event-bus` crate uses `flume`.
 
+> High-level only. The precise dependency list and current versions live in
+> `memory/continuity.md` → `## Stack & Tools` (the live source of truth).
+
 ## Repository Structure
 
 Cargo **workspace** — the `simple-proxy` binary/lib at the repo root, plus a standalone

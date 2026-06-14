@@ -17,8 +17,13 @@ Three triggers:
 2. **On command** — the user says *"review memory"* / *"compact memory"*.
 3. **Size** — when `memory/continuity.md` exceeds `continuity_max_lines`.
 
-`last_review` is tracked in `continuity.md` Project State (a `YYYY-MM-DD` plus the
-session file it last ran through).
+Within a review, one more cadence is checked — **invariant verification**: when
+`sessions_since_last_invariant_check ≥ verify_invariants_every`, the review prompts a
+human to re-confirm the never-decay facts (routine step 6). It rides on the review, so
+it never fires more often than reviews do.
+
+`last_review` and `last_invariant_check` are tracked in `continuity.md` Project State
+(each a `YYYY-MM-DD` plus the session file it last ran through).
 
 ## Inputs
 
@@ -38,19 +43,45 @@ session file it last ran through).
      session date that names the id.
    - `Reactivated`: if the id currently lives in the archive, move it back into
      `continuity.md` as `active`, then apply the Referenced bump.
+   - `Superseded: <old> → <new>` (or `<old> (invalidated)`): confirm the old fact is
+     marked `tier: superseded` + `superseded-by: <new>` (the agent marks it at write
+     time — `DECAY.md` §9; set it here if missing) and the successor carries
+     `supersedes: <old>`.
 3. **Re-tier every fact.** For each fact in `continuity.md`, compute
    `sessions_since_last_used` (count files — `DECAY.md` §4) and apply the
    `DECAY.md` §5 rules in order. Record each tier change.
-4. **Archive.** Facts that resolve to `archived`:
+4. **Archive.** Facts that resolve to `archived` (faded) **or** `superseded` (false):
    - append the fact *with its metadata comment* to `memory/archive/<YYYY>-Q<n>.md`
-     under a dated heading,
-   - add/refresh its line in `memory/archive/INDEX.md` (`id — one-line — <quarter file>`),
+     under a dated heading, noting the reason — `faded` or `superseded by <new-id>`,
+   - add/refresh its line in `memory/archive/INDEX.md`
+     (`id — one-line — <reason> — <quarter file>`),
    - remove it from `continuity.md`.
+   Superseded facts archive **promptly** — no `archive_window` wait, since they are
+   false, not merely stale — and carry their `superseded-by` link into the archive.
 5. **Sweep completed threads.** `- [x]` Open Threads whose completion is older than
    `archive_window` sessions move to the archive the same way (usually the biggest
    lean-up). Keep recently-completed threads for context.
-6. **Stamp.** Set `last_review` to today + the latest session file name.
-7. **Summarise.** Write a `## Memory Review` block into *this* session's log.
+6. **Verify invariants (cadence).** If `sessions_since_last_invariant_check ≥
+   verify_invariants_every` (or `last_invariant_check` is unset and that many session
+   files exist), raise **one** Open Thread listing every never-decay fact —
+   `tier: core` plus everything under `## Architectural Invariants` — for a human to
+   re-confirm:
+   `- [ ] Re-verify invariants (due): confirm <id>, <id>, … still hold, or supersede any that don't (DECAY.md §9)`.
+   The review **never auto-invalidates** an invariant — it only prompts; the human
+   confirms (checks the thread off) or supersedes the false ones (§9). Then set
+   `last_invariant_check` to today + the latest session file. (Never-decay ≠
+   never-checked.) If not due, skip this step.
+7. **Stamp.** Set `last_review` to today + the latest session file name.
+8. **Summarise.** Write a `## Memory Review` block into *this* session's log.
+
+**Contradiction backstop.** The review reads every fact anyway, so give them a quick
+contradiction scan — the write-time check (`DECAY.md` §10) may have missed one, or two
+facts may have drifted into conflict over time. Surface any conflict as a
+`- [ ] Contradiction: <fact> conflicts with <id> — resolve (supersede one, or reconcile)`
+Open Thread; never silently reconcile or pick a winner.
+
+**Smoke test.** A review is also a natural time to run `memory/smoke-test.md` — a quick
+manual check that memory still answers the orientation questions a newcomer would ask.
 
 ## Full rebuild (the ground-truth path)
 
@@ -58,7 +89,8 @@ Because metadata is *derived*, you can discard stored `uses`/`last_used`/`tier`
 and recompute everything from scratch by scanning **all** session logs'
 `## Memory References`. Use this to repair drift, after heavy manual edits, or if
 reviews were skipped for a long stretch. The result is deterministic and
-reproducible by any agent.
+reproducible by any agent. The same scan repairs each fact's `origin` — the earliest
+session whose `## Memory References` names the id under `Created` (`DECAY.md` §11).
 
 ## Reactivation
 
@@ -69,6 +101,8 @@ When an archived id is named in a session (`Referenced`/`Reactivated`):
 - note it in the review summary.
 
 This two-way movement is what keeps the system smart rather than merely lossy.
+**Superseded facts are the exception** — they are terminal (`DECAY.md` §9) and are
+*not* reactivated by a reference; only a human can reverse a supersession by hand.
 
 ---
 
@@ -77,9 +111,11 @@ This two-way movement is what keeps the system smart rather than merely lossy.
 ```markdown
 ## Memory Review (2026-06-20, through 2026-06-20-141503)
 - Reactivated:   1  (drizzle-over-prisma — referenced today after 9 dormant sessions)
-- Archived:      3  facts → memory/archive/2026-Q2.md
+- Superseded:    1  (rest-versioning-v1 → rest-versioning-v2; archived flagged superseded)
+- Archived:      3  facts → memory/archive/2026-Q2.md (faded)
 - Swept threads: 4  completed Open Threads → archive
 - Tier changes:  6  (2 working→active, 1 active→archive-candidate, 3 →archived)
+- Invariants:    not due (next re-verify in 6 sessions)   # or: "prompted — 2 invariants up for re-confirmation"
 - Promoted core: 0  (auto-core off; core is human-set)
 ```
 

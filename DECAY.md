@@ -32,9 +32,21 @@ when rendered, readable and editable by any agent or human, diff-friendly.
 | `last_used` | date of the most recent session that referenced the id | **yes** |
 | `uses` | count of sessions that referenced the id | **yes** |
 | `tier` | lifecycle bucket (see §3) | **yes** |
+| `superseded-by` | *(optional)* id of the fact that replaced this one; set when it is superseded (§9) | no |
+| `supersedes` | *(optional)* id of the fact this one replaced; set on the successor (§9) | no |
+| `origin` | *(optional)* the session-log file where the fact was `Created` — its provenance (§11) | repairable |
 
 There is no `strength` field. Importance is expressed structurally: `tier: core`,
 or membership in the `## Architectural Invariants` section.
+
+### What the agent sets at creation vs. what the review owns
+At creation the agent writes only: `id`, `created: <today>`, `tier: working`, and
+seeds `last_used: <today> | uses: 1` — the creating session names the fact under
+`Created` in its `## Memory References`, so `1` is the honest first count. After
+creation the agent **never hand-edits `uses`, `last_used`, or `tier`**; it records
+references in session logs (§2) and the review recomputes those three (the "yes"
+rows above). `id` and `created` are immutable. Ordinary facts are born `working`
+(§3); only `## Architectural Invariants` facts are born `core`.
 
 ### Assigning an id
 Lowercase, hyphenated, derived from the fact's gist (`webhook-fire-forget`,
@@ -78,11 +90,15 @@ core              permanent. Human-set (§5). Never decays.
 active            referenced within active_window sessions.
 working           created within working_window sessions, not yet re-referenced. Probationary.
 archive-candidate not referenced for > active_window but ≤ archive_window. Flagged, not yet moved.
-archived          not referenced for > archive_window. Moved to memory/archive/YYYY-QN.md.
+archived          not referenced for > archive_window (faded from disuse). Moved to memory/archive/YYYY-QN.md.
+superseded        no longer true — a decision reversed or a fact invalidated (§9). Terminal,
+                  agent/human-set; archived flagged "superseded" (not "faded"); never reactivated.
 ```
 
 Movement is **bidirectional**: an archived id named in a session's `Referenced` or
-`Reactivated` list is pulled back to `active`. Nothing is ever deleted.
+`Reactivated` list is pulled back to `active`. Nothing is ever deleted. The one
+exception is `superseded` (§9) — it is *terminal*: being referenced never revives a
+false fact; only a human can reverse a supersession.
 
 ---
 
@@ -102,25 +118,34 @@ comes after it. Every agent gets the same integer.
 
 Windows come from `memory/decay-policy.md` (integers, in sessions).
 
-1. `tier: core` → **stays core.** Never auto-demoted. (Human override.)
-2. Under `## Architectural Invariants` → **pinned**, treated as core.
-3. Unchecked Open Thread (`- [ ]`) → **pinned active**, never decays (incomplete work).
-4. `created` ≤ `working_window` sessions ago AND `uses ≤ 1` → **working**.
-5. `sessions_since_last_used ≤ active_window` → **active**.
-6. `active_window < sessions_since_last_used ≤ archive_window` → **archive-candidate**.
-7. `sessions_since_last_used > archive_window` → **archived** → move to archive/.
+1. `tier: superseded` (or `superseded-by` is set) → **stays superseded** (§9). The
+   review archives it flagged "superseded"; it never decays back, never reactivates.
+2. `tier: core` → **stays core.** Never auto-demoted. (Human override.)
+3. Under `## Architectural Invariants` → **pinned**, treated as core.
+4. Unchecked Open Thread (`- [ ]`) → **pinned active**, never decays (incomplete work).
+5. `created` ≤ `working_window` sessions ago AND `uses ≤ 1` → **working**.
+6. `sessions_since_last_used ≤ active_window` → **active**.
+7. `active_window < sessions_since_last_used ≤ archive_window` → **archive-candidate**.
+8. `sessions_since_last_used > archive_window` → **archived** → move to archive/.
 
 ---
 
 ## 6. Never-decay set
 
-Exempt from steps 4–7 regardless of counts:
+Exempt from the decay steps (§5 rules 5–8) regardless of counts:
 - `tier: core`
 - everything under `## Architectural Invariants`
 - unchecked Open Threads (`- [ ]`)
+- `tier: superseded` — exempt from *decay*, but the review archives it promptly
+  flagged "superseded" (§9): it leaves because it is false, not because it faded.
 
 A *checked* Open Thread (`- [x]`) becomes eligible to be swept to the archive once
 its completion is older than `archive_window` sessions (see `REVIEW.md`).
+
+> **Never-decay ≠ never-checked.** `core` facts and Architectural Invariants can quietly
+> become *wrong* when circumstances change. The review periodically prompts a human to
+> re-confirm them (or supersede the false ones, §9) — see `verify_invariants_every` in
+> `decay-policy.md` and `REVIEW.md` routine step 6.
 
 ---
 
@@ -137,5 +162,83 @@ confirm rather than promoting silently.
 ## 8. Manual override always wins
 
 Any field a human edits by hand — especially `tier:` — is authoritative. Review
-must not overwrite a hand-set `tier: core` or a hand-set `id`. Prefer archiving
-over deleting, but if a human deletes a fact outright, respect it.
+must not overwrite a hand-set `tier: core`, `tier: superseded`, or a hand-set `id`.
+Prefer archiving over deleting, but if a human deletes a fact outright, respect it.
+
+---
+
+## 9. Supersession — when a fact becomes *false*
+
+Decay handles facts that fall out of *use*. Supersession handles facts that become
+*untrue* — a decision reversed, a convention changed, a dependency dropped. A false
+fact is worse than a stale one, so it is handled **immediately**, not by waiting for
+a window.
+
+When a fact is reversed or invalidated, in the same session:
+
+1. **Record the event** in the session log's `## Memory References`:
+   `- Superseded: <old-id> → <new-id>` (replacement) or
+   `- Superseded: <old-id> (invalidated)` (no replacement). This is the ledger entry.
+2. **Add the successor** (if any) as a normal new fact, born `tier: working`, with
+   `supersedes: <old-id>` in its footer.
+3. **Mark the old fact immediately.** A truth-state change is a manual edit the agent
+   *owns* (unlike `uses`/`last_used`/decay-`tier`, which the review owns): set its
+   footer to `tier: superseded` and add `superseded-by: <new-id>` (omit for pure
+   invalidation). Leave it in place, visibly marked, until the next review — a reader
+   sees "X (superseded by Y)" in the meantime.
+
+At the next review the superseded fact is **archived flagged "superseded"** (distinct
+from "faded"), its `superseded-by`/`supersedes` links preserved in the archive and
+`INDEX.md`, and a `Superseded: N` line added to the review summary. A superseded fact
+is **terminal**: it never decays back and is never reactivated by a reference (it is
+false, not dormant). Only a human can reverse a supersession by hand-editing it back.
+
+> This is the markdown-native analogue of bi-temporal `valid_at`/`expired_at`/
+> `invalid_at`: `created` is "valid from"; supersession is "invalid from now,
+> replaced by <id>" — recorded as an event and a terminal tier, with no scoring.
+
+---
+
+## 10. Write-time contradiction check
+
+A fact is cheapest to validate the moment it's written. When you add or materially
+rewrite a fact, first scan the facts it might conflict with — `core` / Architectural
+Invariants and the active Key Decisions / Conventions in the same area — and act on any
+contradiction instead of silently letting both coexist:
+
+- **Clear replacement** → **supersede** (§9): the new fact wins, the old is marked
+  `superseded`. (E.g. "versioning now via the `Accept` header" replaces "version in the
+  URI path".)
+- **Genuine conflict, unclear winner** → **don't pick a winner.** Keep the existing
+  fact and raise an Open Thread for a human:
+  `- [ ] Contradiction: <new fact> conflicts with <id> — resolve (supersede one, or reconcile)`.
+- **Contradicts a `core` invariant** → surface it prominently and stop; a new fact must
+  not silently override an invariant. Either the invariant is being deliberately
+  superseded (a human-confirmed act, §9) or the new fact is wrong.
+
+This is "pre-consolidation validation," scaled to markdown — a cheap read-and-compare at
+write time, with the review as a periodic backstop (`REVIEW.md`). It is the same
+"surface contradictions, never pick a winner" rule the migration path already uses
+(`MIGRATE.md`), now applied to normal sessions too.
+
+---
+
+## 11. Provenance & retrieval
+
+**Provenance.** The event log already records where each fact came from — its `Created`
+entry in some session's `## Memory References`. Surface that on the fact with an optional
+`origin: <session-file>` footer field, set at creation (the agent knows which session it's
+writing). It makes provenance one hop: read a fact → open its `origin` session → get the
+full "why." A review can repair/backfill `origin` deterministically — the earliest session
+whose `## Memory References` names the id under `Created`. Like `created`, it never changes
+once set. (This is also the cheap defence against memory poisoning: every fact is traceable
+to a session in the immutable ledger.)
+
+**Retrieval at scale.** Retrieval here is deliberately **lexical + indexed**, not
+vector/semantic — that keeps the layer no-code and human-auditable. As memory grows, find
+things by: (1) grep `continuity.md`; (2) grep `archive/INDEX.md` (every archived fact, one
+greppable line); (3) follow a fact's `origin` (or an id's `Created` event) to its session;
+(4) optionally keep `sessions/INDEX.md` for one-line-per-session orientation. This is
+bounded by project scale — one project's memory stays grep-sized. Full vector/semantic
+retrieval is intentionally out of scope: if a repo outgrows grep, that's a signal to split
+or archive, not to bolt on an index server.

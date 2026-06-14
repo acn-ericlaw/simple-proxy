@@ -17,9 +17,13 @@
 - **last_enabled:** 2026-06-13
 - **last_session:** 2026-06-13 (Claude Code)
 - **last_review:** (none yet)
+- **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
 
 ## Stack & Tools
+
+> Canonical live home for the current stack — language version, dependencies, tool
+> versions. `instructions.md` keeps only a high-level descriptor and points here.
 
 - **language:** Rust (edition 2021) — built with cargo 1.95
 - **runtime deps:** proxy — tokio (rt-multi-thread/net/io-util/time/process/signal/sync/macros), serde + serde_json, anyhow. `event-bus` crate — flume (+ tokio dev-only for its example/test)
