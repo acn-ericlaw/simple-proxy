@@ -15,9 +15,9 @@
 - **project:** simple-proxy
 - **status:** Rust + Tokio v2.0.0 Cargo workspace (proxy at root + `event-bus` crate under `crates/`) — committed & pushed to `origin/main`; CI gates (test/fmt/clippy) in place; all five Blueprint gaps closed; 48 tests green; relay is symmetric-teardown relay-design-v3
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — refreshed stale CI/CD section in instructions.md
-- **last_review:** (none yet)
-- **last_invariant_check:** (none yet)
+- **last_session:** 2026-06-15 (Claude Code) — ran the memory REVIEW ritual (cadence: 10 sessions, review_every 10)
+- **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
+- **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
 
 ## Stack & Tools
@@ -38,41 +38,32 @@
 
 - Layer-4 raw TCP forwarder only — protocol-agnostic (SSH/HTTP/HTTPS pass through as
   bytes). nginx is inspiration only; do NOT turn this into an HTTP/L7 proxy.
-  <!-- id: layer-4-only | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
+  <!-- id: layer-4-only | created: 2026-06-13 | last_used: 2026-06-15 | uses: 2 | tier: core -->
 - Minimal dependency footprint — the proxy uses Tokio + serde + anyhow only (explicit
   tokio features, never `"full"`; no clap, no chrono). `flume` lives in the separate
   `event-bus` workspace crate, so the proxy binary links none of it. Minimalism is core.
-  <!-- id: minimal-deps | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
+  <!-- id: minimal-deps | created: 2026-06-13 | last_used: 2026-06-13 | uses: 3 | tier: core -->
 - `serve` gates every inbound connection through the `authorized` IP allow-list (exact
   match or `x.y.z.*` prefix); unauthorized remotes are dropped before any data is
   forwarded. (`forward` mode has no allow-list by design.)
-  <!-- id: authorized-ip-allowlist | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: core -->
+  <!-- id: authorized-ip-allowlist | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: core -->
 
 ## Key Decisions
 
 - One binary, two subcommands: `serve` (config file, optional shell-command target-IP
   discovery OR static `target_ip`, multiple port pairs, IP allow-list, restart-on-dead-
   target) vs. `forward` (CLI args, one static pair, no allow-list — local-dev convenience).
-  <!-- id: two-subcommands | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+  <!-- id: two-subcommands | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - Config `discovery` block is optional; omit it and set a static `target_ip`. Existing
   JSON schema (plural `source_ports`/`target_ports`, `authorized`, `restart`) preserved.
-  <!-- id: optional-discovery | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
-- Core relay: a single `tokio::select!` loop over borrowing `TcpStream::split()`, each
-  read wrapped in `tokio::time::timeout(idle, ..)` for reset-on-activity idle, with TCP
-  half-close on EOF and rx/tx byte counters. (Not `copy_bidirectional` — it can't idle-reset.)
-  <!-- id: relay-design | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: superseded | superseded-by: relay-design-v2 -->
-- Asymmetric teardown (v2): upstream close → `wi.shutdown()` + break immediately (client
-  sees EOF at once; idle connections don't linger). Client write-close → `wu.shutdown()` +
-  continue draining upstream→client (preserves HTTP response / large-payload delivery).
-  `u2c_open` flag removed; only `c2u_open` remains. Commit `03e58b3`.
-  <!-- id: relay-design-v2 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: superseded | superseded-by: relay-design-v3 | origin: sessions/2026-06-15-050643.md | supersedes: relay-design -->
+  <!-- id: optional-discovery | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - Symmetric teardown (v3): EITHER side closing (EOF) → `wu.shutdown()` + `wi.shutdown()` +
   break immediately. Eliminates the keep-alive linger bug (downstream closes, upstream has
   keep-alive → relay now exits at once instead of waiting 1800s). `c2u_open` flag removed.
   `larger_payload_round_trips` test updated to use `read_exact` + defer `OwnedWriteHalf`
   drop until after the read (so FIN isn't sent until data is received). New regression test:
   `client_close_propagates_to_upstream`. All 8 integration tests pass. Clippy/fmt clean.
-  <!-- id: relay-design-v3 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-162002.md | supersedes: relay-design-v2 -->
+  <!-- id: relay-design-v3 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 4 | tier: active | origin: sessions/2026-06-15-162002.md | supersedes: relay-design-v2 -->
 - A client keep-alive connection lingering after an HTTP request completes is EXPECTED, not a
   proxy leak. The proxy (relay-design-v3) tears down promptly when EITHER side closes; with
   keep-alive, neither side closes. Python `requests` holds the socket open via the returned
@@ -82,11 +73,11 @@
   my HTTP request finished").
   <!-- id: keepalive-client-linger-expected | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-165645.md -->
 - Idle timeout default 1800s (30 min), configurable via `idle_timeout_secs`.
-  <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-15 | uses: 2 | tier: active -->
 - Auto-restart hook: a connect timeout to the configured `restart` target port triggers
   `process::exit(1)` so a process manager (systemd/docker) restarts. Detected via typed `io::ErrorKind::TimedOut`
   + a bounded connect timeout (not a locale-fragile error-string match).
-  <!-- id: restart-on-timeout | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: restart-on-timeout | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - Graceful shutdown via a single `tokio::sync::watch` channel; SIGTERM/SIGINT registered
   ONCE process-wide and fanned out (fixes the JS per-port duplicate-handler bug).
   <!-- id: graceful-shutdown | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
@@ -97,7 +88,7 @@
   path (the byte relay stays direct) — preparation for a larger event-bus project. Demo:
   `cargo run -p event-bus --example event_bus_demo`. Modeled on
   `~/sandbox/rust/rust_event_bus_example` but generalized (bytes, both delivery modes).
-  <!-- id: event-bus-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+  <!-- id: event-bus-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
 
 ## Conventions
 
@@ -107,61 +98,70 @@
   <!-- id: logging-convention | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
 - Idiomatic async Rust; `anyhow::Result` at the edges, per-connection errors contained;
   typed `io::ErrorKind` matching. Gate on `cargo fmt --check` + `cargo clippy`.
-  <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+  <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-15 | uses: 2 | tier: active -->
 
 ## Open Threads
+
+- [ ] (blueprint / human gate) All five Blueprint gaps are now closed `[x]` — the
+  Vision↔Current-State gap that `vision-simple-proxy` framed is closed. Per DECAY.md §12,
+  closing the gap is a **human-gated altitude transition**: the maintainer re-confirms the
+  Vision as *realized* (and decides the next horizon — e.g. open the larger event-bus project
+  as the new Vision/Blueprint, or set new gaps), or supersedes the Vision if it has drifted.
+  The review only surfaces this — it does not decide it. Raised by the 2026-06-15 review.
+  <!-- id: ot-vision-gap-closed-rehorizon | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-172641.md -->
 
 - [x] (clarification) User reported a connection lingering after `requests.get()` returned
   (also seen in browsers). Investigated → expected client keep-alive + CPython GC, not a proxy
   bug. Documented as a README FAQ. See `keepalive-client-linger-expected`.
   <!-- id: ot-keepalive-linger-faq | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-165645.md -->
+  <!-- review-note: not named in any session ## Memory References (the origin session 2026-06-15-165645 listed only keepalive-client-linger-expected under Created). Logs are immutable; kept seeded uses:1/last_used per origin rather than fabricate a ledger event. -->
 
 - [x] (bug) Upstream close did not tear down idle client connections promptly — fixed in
   commit `03e58b3` with asymmetric relay teardown. Regression tests added.
-  <!-- id: ot-upstream-close-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-050643.md -->
+  <!-- id: ot-upstream-close-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: active | origin: sessions/2026-06-15-050643.md -->
 
 - [x] (bug) Client close did not tear down keep-alive upstream connections promptly (mirror
   of upstream-close bug) — fixed with symmetric relay teardown (relay-design-v3). Regression
   test `client_close_propagates_to_upstream` added.
-  <!-- id: ot-client-close-keepalive-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-162002.md -->
+  <!-- id: ot-client-close-keepalive-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 2 | tier: active | origin: sessions/2026-06-15-162002.md -->
 
 - [x] (vision-bootstrap) Confirmed the Vision in memory/vision.md — target / success criteria / non-goals set; Blueprint derived below.
-  <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working -->
+  <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-15 | uses: 1 | tier: active | origin: sessions/2026-06-15-044225.md -->
 
 ### Blueprint  (Vision↔Current-State gap — each serves: vision-simple-proxy)
 
 - [x] (blueprint) Commit & baseline the v2.0.0 Rust workspace — committed in `6cd80cd`; all tests green. serves: vision-simple-proxy
-  <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+  <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-15 | uses: 3 | tier: active | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Prove production-grade reliability — graceful shutdown tested (`graceful_shutdown_stops_accept_loop`); auto-restart decision logic unit-tested (`proxy::tests`); `ConnGuard` RAII counter tested; relay teardown paths fully covered. Actual `process::exit(1)` + process-manager cycle requires manual/deploy verification. serves: vision-simple-proxy
-  <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+  <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-15 | uses: 3 | tier: active | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Mature crates/event-bus into a standalone, documented, versioned library with ≥1 real consumer beyond the demo — README expanded, `pipeline` example added (3-stage work-queue pipeline; real architectural consumer). serves: vision-simple-proxy
-  <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+  <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-15 | uses: 3 | tier: active | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks — `lib.rs` documents stable API vs. binary helpers; `#[non_exhaustive]` added to `ExitReason`, `RelayStats`, `Config`, `Discovery`. serves: vision-simple-proxy
-  <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+  <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-15 | uses: 3 | tier: active | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Add CI gates (cargo test/fmt/clippy) — `.github/workflows/ci.yml` committed; runs on push/PR to main. serves: vision-simple-proxy
-  <!-- id: bp-ci-gates | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+  <!-- id: bp-ci-gates | created: 2026-06-14 | last_used: 2026-06-15 | uses: 4 | tier: active | origin: sessions/2026-06-15-044225.md -->
 
 > The v2.0.0 Rust rewrite (2026-06-13) resolved the entire JS-era refactor backlog below.
 
 - [x] `package.json` `"main"` pointed to a non-existent `socket-proxy.js`. Resolved:
   `package.json` removed (now a Cargo project).
-  <!-- id: ot-package-main-wrong | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-package-main-wrong | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] README "Library dependencies" told users to `npm install moment` (stale). Resolved:
   README rewritten for the Rust tool.
-  <!-- id: ot-readme-moment-stale | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-readme-moment-stale | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] README config example used singular `source_port`/`target_port`. Resolved: README
   now documents the real plural `source_ports`/`target_ports` schema.
-  <!-- id: ot-readme-config-keys-mismatch | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-readme-config-keys-mismatch | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] Legacy ES5 idioms (`var`, `==`, `for..in`). Resolved: rewritten in Rust.
-  <!-- id: ot-modernize-es | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-modernize-es | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] Code duplication between the two `.js` files. Resolved: shared `relay`/`log`/etc.
   modules in one crate.
-  <!-- id: ot-extract-shared-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-extract-shared-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] Duplicate SIGTERM/SIGINT handlers (one per forwarded port). Resolved: signals
   registered once, fanned out via the shutdown channel.
-  <!-- id: ot-duplicate-signal-handlers | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-duplicate-signal-handlers | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 - [x] No tests. Resolved: `cargo test` unit + integration suite added.
-  <!-- id: ot-no-tests | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
+  <!-- id: ot-no-tests | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: archive-candidate -->
 
 ## User Preferences
 

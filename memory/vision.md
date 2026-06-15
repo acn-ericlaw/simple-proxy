@@ -7,7 +7,7 @@
 >
 > Confirmed by the maintainer on 2026-06-14 (resolved the `(vision-bootstrap)` gate).
 >
-> <!-- id: vision-simple-proxy | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: core -->
+> <!-- id: vision-simple-proxy | created: 2026-06-14 | last_used: 2026-06-15 | uses: 1 | tier: core -->
 
 ## Elevator statement
 
