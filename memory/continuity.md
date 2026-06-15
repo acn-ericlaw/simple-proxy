@@ -121,7 +121,7 @@
   <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Prove production-grade reliability — graceful shutdown tested (`graceful_shutdown_stops_accept_loop`); auto-restart decision logic unit-tested (`proxy::tests`); `ConnGuard` RAII counter tested; relay teardown paths fully covered. Actual `process::exit(1)` + process-manager cycle requires manual/deploy verification. serves: vision-simple-proxy
   <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
-- [ ] (blueprint) Mature crates/event-bus into a standalone, documented, versioned library with ≥1 real consumer beyond the demo. serves: vision-simple-proxy
+- [x] (blueprint) Mature crates/event-bus into a standalone, documented, versioned library with ≥1 real consumer beyond the demo — README expanded, `pipeline` example added (3-stage work-queue pipeline; real architectural consumer). serves: vision-simple-proxy
   <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [ ] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks. serves: vision-simple-proxy
   <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->

@@ -11,4 +11,4 @@ flume = "0.11"
 
 [dev-dependencies]
 # Only the example and the async test need a runtime; the library itself does not.
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
