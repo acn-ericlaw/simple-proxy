@@ -128,7 +128,8 @@
   clippy `items_after_test_module` error at `src/proxy.rs` under `-D warnings`, surfaced when
   floating `dtolnay/rust-toolchain@stable` rolled 1.95 → 1.96. **Fixed 2026-06-15:** reordered
   `ConnGuard` above its test module; pinned the toolchain via `rust-toolchain.toml` + `rustup`
-  in CI (see `ci-toolchain-pinned`). All gates green locally; GitHub run pending the next push.
+  in CI (see `ci-toolchain-pinned`). Confirmed **green on GitHub** — run 27568410747 on tip
+  `bd65b0e` passed fmt/clippy/test under the pinned 1.96.0.
   <!-- id: ot-ci-items-after-test-module | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-183705.md -->
 
 - [x] (clarification) User reported a connection lingering after `requests.get()` returned
