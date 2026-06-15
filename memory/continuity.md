@@ -15,7 +15,7 @@
 - **project:** simple-proxy
 - **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-13 (Claude Code)
+- **last_session:** 2026-06-14 (Claude Code)
 - **last_review:** (none yet)
 - **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
@@ -90,6 +90,22 @@
   <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
 
 ## Open Threads
+
+- [x] (vision-bootstrap) Confirmed the Vision in memory/vision.md — target / success criteria / non-goals set; Blueprint derived below.
+  <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working -->
+
+### Blueprint  (Vision↔Current-State gap — each serves: vision-simple-proxy)
+
+- [ ] (blueprint) Commit & baseline the v2.0.0 Rust workspace — builds/tests green but not yet committed. serves: vision-simple-proxy
+  <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+- [ ] (blueprint) Prove production-grade reliability — validate unattended deploy + auto-restart + graceful shutdown end-to-end (no dropped-handler / resource-leak regressions). serves: vision-simple-proxy
+  <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+- [ ] (blueprint) Mature crates/event-bus into a standalone, documented, versioned library with ≥1 real consumer beyond the demo. serves: vision-simple-proxy
+  <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+- [ ] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks. serves: vision-simple-proxy
+  <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
+- [ ] (blueprint) Add CI gates (cargo test/fmt/clippy) — none committed today. serves: vision-simple-proxy
+  <!-- id: bp-ci-gates | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 
 > The v2.0.0 Rust rewrite (2026-06-13) resolved the entire JS-era refactor backlog below.
 
