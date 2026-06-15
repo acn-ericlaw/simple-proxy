@@ -15,7 +15,7 @@
 - **project:** simple-proxy
 - **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — all Blueprint gaps closed
+- **last_session:** 2026-06-15 (Claude Code) — documented client keep-alive linger (README FAQ)
 - **last_review:** (none yet)
 - **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
@@ -73,6 +73,14 @@
   drop until after the read (so FIN isn't sent until data is received). New regression test:
   `client_close_propagates_to_upstream`. All 8 integration tests pass. Clippy/fmt clean.
   <!-- id: relay-design-v3 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-162002.md | supersedes: relay-design-v2 -->
+- A client keep-alive connection lingering after an HTTP request completes is EXPECTED, not a
+  proxy leak. The proxy (relay-design-v3) tears down promptly when EITHER side closes; with
+  keep-alive, neither side closes. Python `requests` holds the socket open via the returned
+  `Response` (`r.raw`); it closes on CPython GC (rebind/`del`/exit), the server's keep-alive
+  timeout, or the proxy's `idle_timeout_secs`. Browsers do the same via their connection pool.
+  Reproduced locally with `lsof`. Documented as a README FAQ ("a connection stays open after
+  my HTTP request finished").
+  <!-- id: keepalive-client-linger-expected | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-165645.md -->
 - Idle timeout default 1800s (30 min), configurable via `idle_timeout_secs`.
   <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
 - Auto-restart hook: a connect timeout to the configured `restart` target port triggers
@@ -102,6 +110,11 @@
   <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
 
 ## Open Threads
+
+- [x] (clarification) User reported a connection lingering after `requests.get()` returned
+  (also seen in browsers). Investigated → expected client keep-alive + CPython GC, not a proxy
+  bug. Documented as a README FAQ. See `keepalive-client-linger-expected`.
+  <!-- id: ot-keepalive-linger-faq | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-165645.md -->
 
 - [x] (bug) Upstream close did not tear down idle client connections promptly — fixed in
   commit `03e58b3` with asymmetric relay teardown. Regression tests added.

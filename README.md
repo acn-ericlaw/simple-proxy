@@ -95,6 +95,49 @@ Each line is `<UTC timestamp> [INSTANCE_ID] <message>`. `INSTANCE_ID` is a rando
 per-process id; each connection gets a random session id and reports rx/tx byte counts
 on close. Timestamps are UTC (the original Node.js tool logged local time).
 
+> Seeing `Remaining connections` stay above 0 after an HTTP request finished? That is
+> usually client-side keep-alive, not a leak — see the
+> [FAQ](#faq-a-connection-stays-open-after-my-http-request-finished) below.
+
+## FAQ: "a connection stays open after my HTTP request finished"
+
+This is **expected** and is **not** a proxy bug. It is HTTP **keep-alive** (persistent
+connections), which clients use to reuse one TCP connection across requests.
+
+`simple-proxy` is a Layer-4 forwarder: it keeps a TCP connection open for exactly as long
+as **both** endpoints keep it open, and tears it down the instant **either** side closes
+(client *or* upstream). It does not — and must not — close a connection that both ends are
+deliberately holding open. So a lingering `Remaining connections = 1` after a request
+completes reflects the **client's** keep-alive, not a leak in the proxy.
+
+**Python `requests` / `urllib3`.** After `requests.get()` returns, the underlying socket is
+*not* closed — it is kept alive for reuse, held open by the returned `Response` object
+(`r.raw`). In CPython the socket closes only when that object is garbage-collected. So:
+
+```python
+r = requests.get("http://127.0.0.1:8080/info")  # connection opens, stays ESTABLISHED
+r = requests.get("http://127.0.0.1:8080/info")  # rebinding r drops the old Response →
+                                                 # old socket closes, a new one opens
+del r                                            # last socket closes here
+# (or it closes when the interpreter exits)
+```
+
+This is exactly the pattern in the proxy log: each new request closes the *previous*
+session, and the final connection closes only when Python exits. To close eagerly, use a
+`Session` as a context manager (`with requests.Session() as s: s.get(...)`) or call
+`r.close()`. Verified locally with `lsof`: the socket survives the call's return and
+disappears only on garbage collection.
+
+**Browsers** behave the same way: they keep a pool of persistent connections open per host
+(typically up to ~6) for reuse, closing them only after their own idle timeout. Seeing one
+or more idle connections linger after a page loads is normal.
+
+**When does a keep-alive connection actually close, then?** Whichever happens first:
+the client closes it (GC / explicit close / browser pool timeout), the upstream server's
+keep-alive timeout fires, or `simple-proxy`'s own `idle_timeout_secs` (default 30 min)
+elapses with no traffic. Lower `idle_timeout_secs` if you want idle keep-alive connections
+reclaimed sooner.
+
 ## Running as a service
 
 Run it under a process manager (e.g. **systemd**) or **docker-compose** so a crash or a
