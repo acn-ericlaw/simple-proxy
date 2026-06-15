@@ -13,9 +13,9 @@
 ## Project State
 
 - **project:** simple-proxy
-- **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
+- **status:** Rust + Tokio v2.0.0 Cargo workspace (proxy at root + `event-bus` crate under `crates/`) — committed & pushed to `origin/main`; CI gates (test/fmt/clippy) in place; all five Blueprint gaps closed; 48 tests green; relay is symmetric-teardown relay-design-v3
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — documented client keep-alive linger (README FAQ)
+- **last_session:** 2026-06-15 (Claude Code) — refreshed stale CI/CD section in instructions.md
 - **last_review:** (none yet)
 - **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy

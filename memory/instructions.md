@@ -80,8 +80,11 @@ end-to-end: run an upstream, `simple-proxy forward …` (or `serve`), and `curl`
 
 ## CI / CD
 
-None committed. No `.github/workflows/` or `Dockerfile`/`docker-compose.yml`, though the
-README recommends systemd or docker-compose for deployment.
+GitHub Actions CI is committed at `.github/workflows/ci.yml`: on push to `main` and on every
+pull request, a single Ubuntu job runs `cargo fmt --all --check`, `cargo clippy --workspace
+--all-targets`, and `cargo test --workspace` (warnings denied via `RUSTFLAGS: -D warnings`).
+No `Dockerfile`/`docker-compose.yml`, though the README recommends systemd or docker-compose
+for deployment.
 
 ## Editing These Instructions
 
