@@ -29,6 +29,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
 
+[dev-dependencies]
+# Used only by the `event_bus_signaling` example (and not linked into the binary):
+# demonstrates bridging the proxy's control-plane lifecycle events onto the event bus.
+event-bus = { path = "crates/event-bus" }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

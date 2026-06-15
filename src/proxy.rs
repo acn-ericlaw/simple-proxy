@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::discovery;
 use crate::log::{group, session_id};
 use crate::logln;
+use crate::observer::{ConnEvent, ConnObserver, NoopObserver};
 use crate::relay::{relay, ExitReason};
 use crate::shutdown::Shutdown;
 use anyhow::{Context, Result};
@@ -105,6 +106,10 @@ pub async fn run_forwarder(
 
 /// Accept loop over an already-bound listener. Split out from [`run_forwarder`] so
 /// callers (and tests) can bind an ephemeral port and learn its address first.
+///
+/// Equivalent to [`serve_listener_observed`] with a [`NoopObserver`] — connection
+/// lifecycle events are discarded. The CLI binary uses this path, so it carries no
+/// observability dependencies.
 #[allow(clippy::too_many_arguments)]
 pub async fn serve_listener(
     listener: TcpListener,
@@ -113,6 +118,35 @@ pub async fn serve_listener(
     restart: Option<u16>,
     idle: Duration,
     conns: Arc<AtomicUsize>,
+    shutdown: Shutdown,
+) -> Result<()> {
+    serve_listener_observed(
+        listener,
+        target,
+        allowlist,
+        restart,
+        idle,
+        conns,
+        Arc::new(NoopObserver),
+        shutdown,
+    )
+    .await
+}
+
+/// Like [`serve_listener`], but reports each connection's lifecycle to `observer`
+/// (see [`ConnEvent`]). The observer is a control-plane hook only — the byte relay in
+/// [`crate::relay`] is identical either way. Embedders use this to bridge proxy
+/// lifecycle into metrics, an event bus, tracing, etc. (see the `event_bus_signaling`
+/// example).
+#[allow(clippy::too_many_arguments)]
+pub async fn serve_listener_observed(
+    listener: TcpListener,
+    target: SocketAddr,
+    allowlist: Option<Arc<Vec<String>>>,
+    restart: Option<u16>,
+    idle: Duration,
+    conns: Arc<AtomicUsize>,
+    observer: Arc<dyn ConnObserver>,
     mut shutdown: Shutdown,
 ) -> Result<()> {
     let source = listener
@@ -138,6 +172,7 @@ pub async fn serve_listener(
                             restart,
                             idle,
                             conns.clone(),
+                            observer.clone(),
                             shutdown.clone(),
                         ));
                     }
@@ -171,6 +206,7 @@ async fn handle_connection(
     restart: Option<u16>,
     idle: Duration,
     conns: Arc<AtomicUsize>,
+    observer: Arc<dyn ConnObserver>,
     shutdown: Shutdown,
 ) {
     let remote_ip = peer.ip();
@@ -181,6 +217,7 @@ async fn handle_connection(
                 "Unknown caller {remote_ip} connection to {} rejected",
                 target.port()
             );
+            observer.on_event(ConnEvent::Rejected { peer, target });
             return; // drop the inbound socket
         }
     }
@@ -197,11 +234,21 @@ async fn handle_connection(
                 "Session {session} failed connecting to {target} - {}",
                 e.kind()
             );
+            observer.on_event(ConnEvent::UpstreamUnavailable {
+                session,
+                peer,
+                target,
+            });
             return;
         }
         Err(_elapsed) => {
             maybe_restart(target, restart);
             logln!("Session {session} connect to {target} timed out");
+            observer.on_event(ConnEvent::UpstreamUnavailable {
+                session,
+                peer,
+                target,
+            });
             return;
         }
     };
@@ -210,6 +257,11 @@ async fn handle_connection(
     let _guard = ConnGuard::new(&conns);
     logln!("Session {session} {remote_ip} connected to {target}");
     logln!("Total connections = {}", conns.load(Ordering::Relaxed));
+    observer.on_event(ConnEvent::Opened {
+        session: session.clone(),
+        peer,
+        target,
+    });
 
     let stats = relay(inbound, upstream, idle, shutdown).await;
 
@@ -223,6 +275,14 @@ async fn handle_connection(
         group(stats.rx),
         group(stats.tx)
     );
+    observer.on_event(ConnEvent::Closed {
+        session,
+        peer,
+        target,
+        rx: stats.rx,
+        tx: stats.tx,
+        reason: stats.reason.label(),
+    });
     drop(_guard);
     logln!("Remaining connections = {}", conns.load(Ordering::Relaxed));
 }

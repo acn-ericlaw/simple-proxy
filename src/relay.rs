@@ -30,6 +30,19 @@ pub enum ExitReason {
     Error(std::io::Error),
 }
 
+impl ExitReason {
+    /// A short, stable label for logs, metrics, and lifecycle events
+    /// (`"closed"` / `"idle"` / `"shutdown"` / `"error"`).
+    pub fn label(&self) -> &'static str {
+        match self {
+            ExitReason::Closed => "closed",
+            ExitReason::Idle => "idle",
+            ExitReason::Shutdown => "shutdown",
+            ExitReason::Error(_) => "error",
+        }
+    }
+}
+
 /// Statistics returned by [`relay`] describing the completed relay session.
 ///
 /// Marked `#[non_exhaustive]` so new fields can be added without breaking

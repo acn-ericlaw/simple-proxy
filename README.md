@@ -138,6 +138,26 @@ keep-alive timeout fires, or `simple-proxy`'s own `idle_timeout_secs` (default 3
 elapses with no traffic. Lower `idle_timeout_secs` if you want idle keep-alive connections
 reclaimed sooner.
 
+## Embedding: control-plane events (event-bus example)
+
+When embedding the forwarder you can observe each connection's lifecycle — *opened*,
+*closed* (with byte counts + reason), *rejected*, *upstream-unavailable* — by passing a
+[`ConnObserver`](src/observer.rs) to `proxy::serve_listener_observed`. These are
+**control-plane** signals emitted *around* the byte relay; the data path is untouched, and
+the CLI binary uses a no-op observer by default (so it links no extra dependencies).
+
+The [`event_bus_signaling`](examples/event_bus_signaling.rs) example bridges these events
+onto the workspace's [`event-bus`](crates/event-bus) crate: a **broadcast** subscriber
+prints a live monitor while a **work-queue** worker aggregates connection/byte metrics —
+all driven by real traffic through the actual proxy.
+
+```sh
+cargo run --example event_bus_signaling
+```
+
+`event-bus` is a dev-dependency here, so it is **not** linked into the `simple-proxy`
+binary — the demo keeps the shipping forwarder dependency-light.
+
 ## Running as a service
 
 Run it under a process manager (e.g. **systemd**) or **docker-compose** so a crash or a

@@ -1,11 +1,12 @@
 //! End-to-end tests: drive the real accept loop + relay in-process against an
 //! in-process echo server.
 
-use simple_proxy::proxy::{bind_reuse, serve_listener};
+use simple_proxy::observer::{ConnEvent, ConnObserver};
+use simple_proxy::proxy::{bind_reuse, serve_listener, serve_listener_observed};
 use simple_proxy::shutdown;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -246,6 +247,111 @@ async fn client_close_propagates_to_upstream() {
              (relay is holding the upstream connection open — keep-alive linger bug)",
         )
         .unwrap();
+}
+
+/// A test [`ConnObserver`] that records a label for each event it receives.
+#[derive(Default)]
+struct CollectingObserver {
+    events: Mutex<Vec<&'static str>>,
+}
+
+impl ConnObserver for CollectingObserver {
+    fn on_event(&self, event: ConnEvent) {
+        let label = match event {
+            ConnEvent::Opened { .. } => "opened",
+            ConnEvent::Closed { .. } => "closed",
+            ConnEvent::Rejected { .. } => "rejected",
+            ConnEvent::UpstreamUnavailable { .. } => "upstream_unavailable",
+            _ => "other", // ConnEvent is #[non_exhaustive]
+        };
+        self.events.lock().unwrap().push(label);
+    }
+}
+
+/// Start an observer-aware forwarder on an ephemeral loopback port; returns its address
+/// plus the controller (keep it alive — dropping it would signal shutdown).
+async fn spawn_observed_proxy(
+    target: SocketAddr,
+    allowlist: Option<Vec<String>>,
+    observer: Arc<dyn ConnObserver>,
+) -> (SocketAddr, shutdown::ShutdownController) {
+    let listener = bind_reuse("127.0.0.1:0".parse().unwrap()).unwrap();
+    let source = listener.local_addr().unwrap();
+    let (ctrl, sd) = shutdown::channel();
+    let allow = allowlist.map(Arc::new);
+    let conns = Arc::new(AtomicUsize::new(0));
+    tokio::spawn(async move {
+        let _ = serve_listener_observed(
+            listener,
+            target,
+            allow,
+            None,
+            Duration::from_secs(30),
+            conns,
+            observer,
+            sd,
+        )
+        .await;
+    });
+    (source, ctrl)
+}
+
+/// Poll `pred` every 20 ms for up to ~2 s; returns whether it became true.
+async fn wait_until(pred: impl Fn() -> bool) -> bool {
+    for _ in 0..100 {
+        if pred() {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    false
+}
+
+#[tokio::test]
+async fn observer_receives_open_and_close_events() {
+    let echo = spawn_echo().await;
+    let observer = Arc::new(CollectingObserver::default());
+    let (proxy, _ctrl) =
+        spawn_observed_proxy(echo, Some(vec!["127.0.0.1".into()]), observer.clone()).await;
+
+    let mut client = TcpStream::connect(proxy).await.unwrap();
+    client.write_all(b"hi").await.unwrap();
+    let mut buf = [0u8; 2];
+    client.read_exact(&mut buf).await.unwrap();
+    drop(client); // close → relay tears down → Closed
+
+    let ok = wait_until(|| {
+        let ev = observer.events.lock().unwrap();
+        ev.contains(&"opened") && ev.contains(&"closed")
+    })
+    .await;
+    assert!(
+        ok,
+        "expected opened + closed events, got {:?}",
+        observer.events.lock().unwrap()
+    );
+}
+
+#[tokio::test]
+async fn observer_receives_rejected_event() {
+    let echo = spawn_echo().await;
+    let observer = Arc::new(CollectingObserver::default());
+    // Allow-list excludes loopback, so our 127.0.0.1 client is rejected before any relay.
+    let (proxy, _ctrl) =
+        spawn_observed_proxy(echo, Some(vec!["10.0.0.1".into()]), observer.clone()).await;
+
+    let mut client = TcpStream::connect(proxy).await.unwrap();
+    let _ = client.write_all(b"nope").await;
+    let mut buf = [0u8; 8];
+    let _ = client.read(&mut buf).await;
+
+    let ok = wait_until(|| observer.events.lock().unwrap().contains(&"rejected")).await;
+    let ev = observer.events.lock().unwrap();
+    assert!(ok, "expected a rejected event, got {ev:?}");
+    assert!(
+        !ev.contains(&"opened"),
+        "a rejected connection must not open a relay, got {ev:?}"
+    );
 }
 
 #[tokio::test]

@@ -11,9 +11,13 @@
 //! - [`proxy`] — high-level entry points ([`run_serve`](proxy::run_serve),
 //!   [`run_forward`](proxy::run_forward)) plus the lower-level
 //!   [`serve_listener`](proxy::serve_listener) / [`bind_reuse`](proxy::bind_reuse)
-//!   used in integration tests
+//!   used in integration tests, and the observer-aware
+//!   [`serve_listener_observed`](proxy::serve_listener_observed)
 //! - [`relay`] — the bidirectional byte relay ([`relay`](relay::relay),
 //!   [`RelayStats`](relay::RelayStats), [`ExitReason`](relay::ExitReason))
+//! - [`observer`] — control-plane lifecycle hook ([`ConnEvent`](observer::ConnEvent),
+//!   [`ConnObserver`](observer::ConnObserver)); emitted around the relay, never in the
+//!   data path. See the `event_bus_signaling` example.
 //! - [`shutdown`] — graceful shutdown primitives ([`channel`](shutdown::channel),
 //!   [`ShutdownController`](shutdown::ShutdownController), [`Shutdown`](shutdown::Shutdown))
 //! - [`allowlist`] — IP allow-list checking ([`is_authorized`](allowlist::is_authorized))
@@ -30,6 +34,7 @@
 // Stable embedding API
 pub mod allowlist;
 pub mod config;
+pub mod observer;
 pub mod proxy;
 pub mod relay;
 pub mod shutdown;
