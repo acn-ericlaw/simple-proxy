@@ -3,8 +3,9 @@
 //! `tokio::io::copy_bidirectional` would give byte counts but cannot reset an idle
 //! timer on activity, so we hand-roll a single `select!` loop over the split halves
 //! and wrap each read in `tokio::time::timeout(idle, ..)`. A fresh timeout per
-//! iteration yields reset-on-activity semantics (matching the JS `socket.setTimeout`),
-//! and we honour TCP half-close by shutting down only the finished direction.
+//! iteration yields reset-on-activity semantics (matching the JS `socket.setTimeout`).
+//! Either side closing (EOF) triggers immediate full teardown of the relay so that
+//! keep-alive servers don't hold connections open after the client has gone.
 
 use crate::shutdown::Shutdown;
 use std::time::Duration;
@@ -45,10 +46,6 @@ pub async fn relay(
     let (mut ru, mut wu) = upstream.split();
     let mut rx: u64 = 0;
     let mut tx: u64 = 0;
-    // Once the client half-closes its write side we stop reading from it but keep
-    // draining the upstream response back to the client (e.g. the echo of a large
-    // request, or a server-sent-events stream that outlasts the request body).
-    let mut c2u_open = true;
     let mut buf_c = vec![0u8; BUF_SIZE];
     let mut buf_u = vec![0u8; BUF_SIZE];
 
@@ -56,18 +53,20 @@ pub async fn relay(
         tokio::select! {
             biased;
 
-            // Graceful shutdown: FIN both directions and stop.
             _ = shutdown.wait() => {
                 let _ = wu.shutdown().await;
                 let _ = wi.shutdown().await;
                 break ExitReason::Shutdown;
             }
 
-            // client -> upstream: half-close when the client finishes sending so the
-            // upstream can flush its response, but keep the upstream->client leg open.
-            r = tokio::time::timeout(idle, ri.read(&mut buf_c)), if c2u_open => match r {
+            // client -> upstream: either side closing tears down the whole relay.
+            r = tokio::time::timeout(idle, ri.read(&mut buf_c)) => match r {
                 Err(_elapsed) => break ExitReason::Idle,
-                Ok(Ok(0)) => { let _ = wu.shutdown().await; c2u_open = false; }
+                Ok(Ok(0)) => {
+                    let _ = wu.shutdown().await;
+                    let _ = wi.shutdown().await;
+                    break ExitReason::Closed;
+                }
                 Ok(Ok(n)) => match wu.write_all(&buf_c[..n]).await {
                     Ok(()) => rx += n as u64,
                     Err(e) => break ExitReason::Error(e),
@@ -75,11 +74,13 @@ pub async fn relay(
                 Ok(Err(e)) => break ExitReason::Error(e),
             },
 
-            // upstream -> client: full teardown the moment the upstream closes so that
-            // idle client connections are not held open until the idle timer fires.
+            // upstream -> client: same symmetric teardown.
             r = tokio::time::timeout(idle, ru.read(&mut buf_u)) => match r {
                 Err(_elapsed) => break ExitReason::Idle,
-                Ok(Ok(0)) => { let _ = wi.shutdown().await; break ExitReason::Closed; }
+                Ok(Ok(0)) => {
+                    let _ = wi.shutdown().await;
+                    break ExitReason::Closed;
+                }
                 Ok(Ok(n)) => match wi.write_all(&buf_u[..n]).await {
                     Ok(()) => tx += n as u64,
                     Err(e) => break ExitReason::Error(e),

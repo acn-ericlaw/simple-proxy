@@ -91,16 +91,19 @@ async fn larger_payload_round_trips() {
     let (mut r, mut w) = client.into_split();
     let payload: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
 
-    // Read concurrently with writing to avoid backpressure deadlock on a 200KB echo.
+    // Write concurrently with reading to avoid backpressure deadlock on a 200KB echo.
+    // Return `w` from the task so the OwnedWriteHalf is not dropped (no FIN sent) until
+    // after read_exact completes — symmetric teardown would otherwise close the relay
+    // before the echo data returns.
     let p = payload.clone();
     let writer = tokio::spawn(async move {
         w.write_all(&p).await.unwrap();
-        w.shutdown().await.unwrap(); // half-close so the echo + relay drain and EOF
+        w
     });
 
-    let mut got = Vec::new();
-    r.read_to_end(&mut got).await.unwrap();
-    writer.await.unwrap();
+    let mut got = vec![0u8; payload.len()];
+    r.read_exact(&mut got).await.unwrap();
+    drop(writer.await.unwrap()); // drop write half (sends FIN) only after read completes
     assert_eq!(got, payload, "all {} bytes must round-trip", payload.len());
 }
 
@@ -160,8 +163,7 @@ async fn upstream_close_propagates_eof_to_idle_client() {
         drop(sock); // OS sends FIN
     });
 
-    let (proxy_addr, _ctrl, _h) =
-        spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
+    let (proxy_addr, _ctrl, _h) = spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
 
     let mut client = TcpStream::connect(proxy_addr).await.unwrap();
 
@@ -194,22 +196,56 @@ async fn upstream_close_after_data_propagates_to_idle_client() {
         drop(sock);
     });
 
-    let (proxy_addr, _ctrl, _h) =
-        spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
+    let (proxy_addr, _ctrl, _h) = spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
 
     let mut client = TcpStream::connect(proxy_addr).await.unwrap();
 
     let mut got = Vec::new();
-    let result =
-        tokio::time::timeout(Duration::from_secs(5), client.read_to_end(&mut got)).await;
+    let result = tokio::time::timeout(Duration::from_secs(5), client.read_to_end(&mut got)).await;
 
     match result {
         Ok(Ok(_)) => assert_eq!(got, b"hello from server", "data must arrive intact"),
         Ok(Err(e)) => panic!("unexpected read error: {e}"),
-        Err(_) => panic!(
-            "server close (after sending data) was NOT propagated to the client within 5 s"
-        ),
+        Err(_) => {
+            panic!("server close (after sending data) was NOT propagated to the client within 5 s")
+        }
     }
+}
+
+/// Mirror of upstream_close_propagates_eof_to_idle_client:
+/// when the client closes its side the relay must propagate that close to the upstream
+/// immediately — not after the idle timer — even when the upstream has keep-alive
+/// and would otherwise hold the connection open indefinitely.
+#[tokio::test]
+async fn client_close_propagates_to_upstream() {
+    // Server: accept one connection, hold it open (simulates HTTP keep-alive), then
+    // signal once the relay closes the upstream leg.
+    let server_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server_addr = server_listener.local_addr().unwrap();
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    tokio::spawn(async move {
+        let (mut sock, _) = server_listener.accept().await.unwrap();
+        let mut buf = [0u8; 16];
+        // Blocks until the relay tears down the upstream connection (FIN or RST).
+        let _ = sock.read(&mut buf).await;
+        let _ = tx.send(());
+    });
+
+    // Long idle (30 s) so any teardown within 5 s must be driven by the client-close
+    // path, not the idle-timeout path.
+    let (proxy_addr, _ctrl, _h) = spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
+
+    let client = TcpStream::connect(proxy_addr).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    drop(client); // full close — OS sends FIN
+
+    tokio::time::timeout(Duration::from_secs(5), rx)
+        .await
+        .expect(
+            "client close was NOT propagated to upstream within 5 s \
+             (relay is holding the upstream connection open — keep-alive linger bug)",
+        )
+        .unwrap();
 }
 
 #[tokio::test]

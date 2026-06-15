@@ -65,7 +65,14 @@
   sees EOF at once; idle connections don't linger). Client write-close → `wu.shutdown()` +
   continue draining upstream→client (preserves HTTP response / large-payload delivery).
   `u2c_open` flag removed; only `c2u_open` remains. Commit `03e58b3`.
-  <!-- id: relay-design-v2 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-050643.md | supersedes: relay-design -->
+  <!-- id: relay-design-v2 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: superseded | superseded-by: relay-design-v3 | origin: sessions/2026-06-15-050643.md | supersedes: relay-design -->
+- Symmetric teardown (v3): EITHER side closing (EOF) → `wu.shutdown()` + `wi.shutdown()` +
+  break immediately. Eliminates the keep-alive linger bug (downstream closes, upstream has
+  keep-alive → relay now exits at once instead of waiting 1800s). `c2u_open` flag removed.
+  `larger_payload_round_trips` test updated to use `read_exact` + defer `OwnedWriteHalf`
+  drop until after the read (so FIN isn't sent until data is received). New regression test:
+  `client_close_propagates_to_upstream`. All 8 integration tests pass. Clippy/fmt clean.
+  <!-- id: relay-design-v3 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-162002.md | supersedes: relay-design-v2 -->
 - Idle timeout default 1800s (30 min), configurable via `idle_timeout_secs`.
   <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
 - Auto-restart hook: a connect timeout to the configured `restart` target port triggers
@@ -99,6 +106,11 @@
 - [x] (bug) Upstream close did not tear down idle client connections promptly — fixed in
   commit `03e58b3` with asymmetric relay teardown. Regression tests added.
   <!-- id: ot-upstream-close-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-050643.md -->
+
+- [x] (bug) Client close did not tear down keep-alive upstream connections promptly (mirror
+  of upstream-close bug) — fixed with symmetric relay teardown (relay-design-v3). Regression
+  test `client_close_propagates_to_upstream` added.
+  <!-- id: ot-client-close-keepalive-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-162002.md -->
 
 - [x] (vision-bootstrap) Confirmed the Vision in memory/vision.md — target / success criteria / non-goals set; Blueprint derived below.
   <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working -->
