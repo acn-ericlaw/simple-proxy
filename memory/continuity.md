@@ -117,7 +117,7 @@
 
 ### Blueprint  (Vision↔Current-State gap — each serves: vision-simple-proxy)
 
-- [ ] (blueprint) Commit & baseline the v2.0.0 Rust workspace — builds/tests green but not yet committed. serves: vision-simple-proxy
+- [x] (blueprint) Commit & baseline the v2.0.0 Rust workspace — committed in `6cd80cd`; all tests green. serves: vision-simple-proxy
   <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [ ] (blueprint) Prove production-grade reliability — validate unattended deploy + auto-restart + graceful shutdown end-to-end (no dropped-handler / resource-leak regressions). serves: vision-simple-proxy
   <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
@@ -125,7 +125,7 @@
   <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [ ] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks. serves: vision-simple-proxy
   <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
-- [ ] (blueprint) Add CI gates (cargo test/fmt/clippy) — none committed today. serves: vision-simple-proxy
+- [x] (blueprint) Add CI gates (cargo test/fmt/clippy) — `.github/workflows/ci.yml` committed; runs on push/PR to main. serves: vision-simple-proxy
   <!-- id: bp-ci-gates | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 
 > The v2.0.0 Rust rewrite (2026-06-13) resolved the entire JS-era refactor backlog below.
