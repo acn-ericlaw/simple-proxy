@@ -15,7 +15,7 @@
 - **project:** simple-proxy
 - **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-14 (Claude Code)
+- **last_session:** 2026-06-15 (Claude Code)
 - **last_review:** (none yet)
 - **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
@@ -60,7 +60,12 @@
 - Core relay: a single `tokio::select!` loop over borrowing `TcpStream::split()`, each
   read wrapped in `tokio::time::timeout(idle, ..)` for reset-on-activity idle, with TCP
   half-close on EOF and rx/tx byte counters. (Not `copy_bidirectional` — it can't idle-reset.)
-  <!-- id: relay-design | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
+  <!-- id: relay-design | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: superseded | superseded-by: relay-design-v2 -->
+- Asymmetric teardown (v2): upstream close → `wi.shutdown()` + break immediately (client
+  sees EOF at once; idle connections don't linger). Client write-close → `wu.shutdown()` +
+  continue draining upstream→client (preserves HTTP response / large-payload delivery).
+  `u2c_open` flag removed; only `c2u_open` remains. Commit `03e58b3`.
+  <!-- id: relay-design-v2 | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-050643.md | supersedes: relay-design -->
 - Idle timeout default 1800s (30 min), configurable via `idle_timeout_secs`.
   <!-- id: idle-timeout-30m | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: active -->
 - Auto-restart hook: a connect timeout to the configured `restart` target port triggers
@@ -90,6 +95,10 @@
   <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-13 | uses: 1 | tier: working -->
 
 ## Open Threads
+
+- [x] (bug) Upstream close did not tear down idle client connections promptly — fixed in
+  commit `03e58b3` with asymmetric relay teardown. Regression tests added.
+  <!-- id: ot-upstream-close-bug | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-050643.md -->
 
 - [x] (vision-bootstrap) Confirmed the Vision in memory/vision.md — target / success criteria / non-goals set; Blueprint derived below.
   <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working -->
