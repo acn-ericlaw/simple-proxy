@@ -18,9 +18,11 @@
   stable 1.96.0 via `rust-toolchain.toml` after a floating-stable lint break (`ci-toolchain-pinned`); 48 tests
   green; relay is symmetric-teardown relay-design-v3. **Active horizon: `event-bus` maturation** — the
   maintainer promoted the in-process `event-bus` crate to the new Vision (`vision-event-bus`);
-  a fresh Phase-1 Blueprint is open (see below). event-bus is v0.1.0 today.
+  Phase-1 Blueprint open (see below). First gap **done**: the `event_bus_signaling` demo wires
+  control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
+  (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — fixed failing CI (clippy `items_after_test_module`, surfaced by floating-stable drift), reordered `ConnGuard` above its test module, and pinned the toolchain via `rust-toolchain.toml`. (Earlier same day: Vision re-horizon to `vision-event-bus`.)
+- **last_session:** 2026-06-15 (Claude Code) — implemented `bp-eb-proxy-signaling-demo`: a `ConnObserver` control-plane hook + the `event_bus_signaling` worked example (event-bus as dev-dep; binary stays flume-free). 50 tests green. (Earlier same day: CI fix + toolchain pin; Vision re-horizon to `vision-event-bus`.)
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
@@ -94,6 +96,16 @@
   `cargo run -p event-bus --example event_bus_demo`. Modeled on
   `~/sandbox/rust/rust_event_bus_example` but generalized (bytes, both delivery modes).
   <!-- id: event-bus-module | created: 2026-06-13 | last_used: 2026-06-13 | uses: 2 | tier: active -->
+- Control-plane lifecycle hook (realizes `bp-eb-proxy-signaling-demo`): the `observer` module
+  (`ConnEvent` {Rejected, UpstreamUnavailable, Opened, Closed{rx,tx,reason}}, `ConnObserver`
+  trait, `NoopObserver`) + `proxy::serve_listener_observed`. Events fire AROUND the relay
+  (control plane only — `relay()` byte path untouched, `layer-4-only` preserved). The default
+  path (`serve_listener`, the CLI binary) uses `NoopObserver` and links nothing extra;
+  `event-bus` is a **dev-dependency** used ONLY by the `event_bus_signaling` example, so the
+  shipping binary stays flume-free (`minimal-deps`). Example shows broadcast (live monitor) +
+  work-queue (metrics) delivery driven by real proxy traffic. Now part of the stable embedding
+  surface (`bp-embedding-surface`); `ExitReason::label()` added for stable close-reason strings.
+  <!-- id: conn-observer-hook | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-190408.md -->
 
 ## Conventions
 
@@ -172,14 +184,16 @@
   and `queues` maps don't grow unbounded (today only dead broadcast subscribers are pruned;
   queue channels and empty route entries persist forever). serves: vision-event-bus
   <!-- id: bp-eb-route-lifecycle | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
-- [ ] (blueprint) **simple-proxy control-plane signaling demo (experiment).** Wire the
+- [x] (blueprint) **simple-proxy control-plane signaling demo (experiment).** Wire the
   event-bus into a simple-proxy *demo* to signal connection-lifecycle events (socket open /
   close, etc.) on the **control plane** — NOT the byte data path. Must be a separate example /
   feature-gated artifact so the shipping `simple-proxy` binary stays flume-free
   (`minimal-deps` core invariant) and the relay stays direct (`layer-4-only`). A learning
   vehicle to refine the bus before a real-world consumer. **Constraint maintainer-confirmed
   2026-06-15** (separate artifact, not flume in the shipping binary — do not re-open without
-  an explicit `minimal-deps` invariant change). serves: vision-event-bus
+  an explicit `minimal-deps` invariant change). **Done 2026-06-15:** added a no-op-by-default
+  `ConnObserver` hook (`conn-observer-hook`) + the `event_bus_signaling` example (event-bus
+  as a dev-dependency only). 50 tests green; demo runs. serves: vision-event-bus
   <!-- id: bp-eb-proxy-signaling-demo | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
 - [ ] (blueprint) **Real-world consumer (after the experiment).** ≥1 real integration that is
   NOT simple-proxy and NOT an example/demo — a genuine consumer that exercises the *refined*
