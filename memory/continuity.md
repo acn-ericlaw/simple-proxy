@@ -12,10 +12,15 @@
 
 ## Project State
 
-- **project:** simple-proxy
-- **status:** Rust + Tokio v2.0.0 Cargo workspace (proxy at root + `event-bus` crate under `crates/`) — committed & pushed to `origin/main`; CI gates (test/fmt/clippy) in place; all five Blueprint gaps closed; 48 tests green; relay is symmetric-teardown relay-design-v3
+- **project:** simple-proxy  (Cargo workspace: proxy at root + `event-bus` crate under `crates/`)
+- **status:** simple-proxy v2.0.0 is **realized & in maintenance** — committed & pushed to
+  `origin/main`; CI gates (test/fmt/clippy) in place — toolchain now **pinned** to latest
+  stable 1.96.0 via `rust-toolchain.toml` after a floating-stable lint break (`ci-toolchain-pinned`); 48 tests
+  green; relay is symmetric-teardown relay-design-v3. **Active horizon: `event-bus` maturation** — the
+  maintainer promoted the in-process `event-bus` crate to the new Vision (`vision-event-bus`);
+  a fresh Phase-1 Blueprint is open (see below). event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — ran the memory REVIEW ritual (cadence: 10 sessions, review_every 10)
+- **last_session:** 2026-06-15 (Claude Code) — fixed failing CI (clippy `items_after_test_module`, surfaced by floating-stable drift), reordered `ConnGuard` above its test module, and pinned the toolchain via `rust-toolchain.toml`. (Earlier same day: Vision re-horizon to `vision-event-bus`.)
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
@@ -99,16 +104,32 @@
 - Idiomatic async Rust; `anyhow::Result` at the edges, per-connection errors contained;
   typed `io::ErrorKind` matching. Gate on `cargo fmt --check` + `cargo clippy`.
   <!-- id: rust-style | created: 2026-06-13 | last_used: 2026-06-15 | uses: 2 | tier: active -->
+- Toolchain is **pinned** via `rust-toolchain.toml` (`channel = "1.96.0"` — the current latest
+  stable; components `rustfmt`/`clippy`) — the single source of truth for local builds AND CI.
+  CI honors it with `rustup show` (NOT `dtolnay/rust-toolchain@stable`, which ignores the toml
+  and floats). This exists because floating stable + `RUSTFLAGS: -D warnings` once turned a
+  newly-promoted clippy lint into a no-code-change CI break. Bump `channel` deliberately — and
+  re-run fmt/clippy/test under the new version — to adopt new lints (done for 1.96.0 on
+  2026-06-15: all gates green).
+  <!-- id: ci-toolchain-pinned | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-183705.md -->
 
 ## Open Threads
 
-- [ ] (blueprint / human gate) All five Blueprint gaps are now closed `[x]` — the
-  Vision↔Current-State gap that `vision-simple-proxy` framed is closed. Per DECAY.md §12,
-  closing the gap is a **human-gated altitude transition**: the maintainer re-confirms the
-  Vision as *realized* (and decides the next horizon — e.g. open the larger event-bus project
-  as the new Vision/Blueprint, or set new gaps), or supersedes the Vision if it has drifted.
-  The review only surfaces this — it does not decide it. Raised by the 2026-06-15 review.
+- [x] (blueprint / human gate) The `vision-simple-proxy` gap closed (all five gaps `[x]`).
+  **Resolved 2026-06-15:** the maintainer confirmed that Vision **realized** and chose to
+  promote the in-process `event-bus` crate to the new Vision (`vision-event-bus`, in
+  `memory/vision.md`) — scope: mature the in-process library (bounded/backpressure,
+  typed-optional, observable, route lifecycle, versioned); simple-proxy stays independent /
+  maintenance and is NOT the bus's consumer. Realized `vision-simple-proxy` archived flagged
+  superseded. New Phase-1 Blueprint opened below. Raised by the 2026-06-15 review.
   <!-- id: ot-vision-gap-closed-rehorizon | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-172641.md -->
+
+- [x] (ci-bug) GitHub Actions CI was red on every recent push (even memory-only commits):
+  clippy `items_after_test_module` error at `src/proxy.rs` under `-D warnings`, surfaced when
+  floating `dtolnay/rust-toolchain@stable` rolled 1.95 → 1.96. **Fixed 2026-06-15:** reordered
+  `ConnGuard` above its test module; pinned the toolchain via `rust-toolchain.toml` + `rustup`
+  in CI (see `ci-toolchain-pinned`). All gates green locally; GitHub run pending the next push.
+  <!-- id: ot-ci-items-after-test-module | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-183705.md -->
 
 - [x] (clarification) User reported a connection lingering after `requests.get()` returned
   (also seen in browsers). Investigated → expected client keep-alive + CPython GC, not a proxy
@@ -128,7 +149,48 @@
 - [x] (vision-bootstrap) Confirmed the Vision in memory/vision.md — target / success criteria / non-goals set; Blueprint derived below.
   <!-- id: ot-vision-bootstrap | created: 2026-06-14 | last_used: 2026-06-15 | uses: 1 | tier: active | origin: sessions/2026-06-15-044225.md -->
 
-### Blueprint  (Vision↔Current-State gap — each serves: vision-simple-proxy)
+### Blueprint — Phase 1: mature the in-process event-bus  (Vision↔Current-State gap — each serves: vision-event-bus)
+
+> Opened 2026-06-15 by the re-horizon human gate (`ot-vision-gap-closed-rehorizon`). Scope
+> confirmed by the maintainer: mature `crates/event-bus` (v0.1.0) as a production-grade,
+> minimal, embeddable **in-process** library. Networking is explicitly out of scope (a future
+> Vision, not this one). simple-proxy is NOT the consumer — the bus proves itself elsewhere.
+
+- [ ] (blueprint) **Bounded delivery + backpressure.** Replace the unconditional unbounded
+  flume channels with a configurable bounded option and an explicit overflow policy
+  (block / drop-oldest / reject); `Delivered` reports rejection. serves: vision-event-bus
+  <!-- id: bp-eb-bounded-backpressure | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **Typed-optional payload layer.** An opt-in (feature-gated) typed/serde
+  API over the `Vec<u8>` core — `publish_typed::<T>` / typed receivers — without forcing serde
+  on byte-level users. Preserves minimal-deps. serves: vision-event-bus
+  <!-- id: bp-eb-typed-payloads | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **Observability.** Per-route metrics exposed through a stable API: queue
+  depth, delivered / dropped counts, subscriber & worker counts. serves: vision-event-bus
+  <!-- id: bp-eb-observability | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **Route lifecycle.** Teardown/reclaim of routes & queues so the `broadcast`
+  and `queues` maps don't grow unbounded (today only dead broadcast subscribers are pruned;
+  queue channels and empty route entries persist forever). serves: vision-event-bus
+  <!-- id: bp-eb-route-lifecycle | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **simple-proxy control-plane signaling demo (experiment).** Wire the
+  event-bus into a simple-proxy *demo* to signal connection-lifecycle events (socket open /
+  close, etc.) on the **control plane** — NOT the byte data path. Must be a separate example /
+  feature-gated artifact so the shipping `simple-proxy` binary stays flume-free
+  (`minimal-deps` core invariant) and the relay stays direct (`layer-4-only`). A learning
+  vehicle to refine the bus before a real-world consumer. **Constraint maintainer-confirmed
+  2026-06-15** (separate artifact, not flume in the shipping binary — do not re-open without
+  an explicit `minimal-deps` invariant change). serves: vision-event-bus
+  <!-- id: bp-eb-proxy-signaling-demo | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **Real-world consumer (after the experiment).** ≥1 real integration that is
+  NOT simple-proxy and NOT an example/demo — a genuine consumer that exercises the *refined*
+  bus in anger. Informed by, and sequenced after, the signaling-demo experiment above.
+  serves: vision-event-bus
+  <!-- id: bp-eb-real-consumer | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+- [ ] (blueprint) **Stable, versioned, published.** Settle the 1.0 public surface
+  (`#[non_exhaustive]` where apt), docs + CHANGELOG, and publish (crates.io or internal
+  registry) so a larger system can depend on it without forks. serves: vision-event-bus
+  <!-- id: bp-eb-publish-stable | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-181756.md -->
+
+### Blueprint (realized) — vision-simple-proxy  (all closed 2026-06-15; left in place until the review sweeps them past archive_window 20)
 
 - [x] (blueprint) Commit & baseline the v2.0.0 Rust workspace — committed in `6cd80cd`; all tests green. serves: vision-simple-proxy
   <!-- id: bp-commit-baseline | created: 2026-06-14 | last_used: 2026-06-15 | uses: 3 | tier: active | origin: sessions/2026-06-15-044225.md -->

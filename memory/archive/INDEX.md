@@ -8,3 +8,4 @@
 |---|---|---|---|
 | relay-design | core relay: manual `select!` loop, half-close on EOF, idle-reset timeout | superseded by relay-design-v2 | 2026-Q2.md |
 | relay-design-v2 | asymmetric relay teardown (upstream close → break; client close → drain) | superseded by relay-design-v3 | 2026-Q2.md |
+| vision-simple-proxy | prior Vision: minimal L4 forwarder + proving ground for the event-bus | realized; superseded by vision-event-bus (re-horizon) | 2026-Q2.md |
