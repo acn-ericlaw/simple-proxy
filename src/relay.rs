@@ -45,16 +45,14 @@ pub async fn relay(
     let (mut ru, mut wu) = upstream.split();
     let mut rx: u64 = 0;
     let mut tx: u64 = 0;
-    let mut c2u_open = true; // client -> upstream still flowing
-    let mut u2c_open = true; // upstream -> client still flowing
+    // Once the client half-closes its write side we stop reading from it but keep
+    // draining the upstream response back to the client (e.g. the echo of a large
+    // request, or a server-sent-events stream that outlasts the request body).
+    let mut c2u_open = true;
     let mut buf_c = vec![0u8; BUF_SIZE];
     let mut buf_u = vec![0u8; BUF_SIZE];
 
     let reason = loop {
-        if !c2u_open && !u2c_open {
-            break ExitReason::Closed;
-        }
-
         tokio::select! {
             biased;
 
@@ -65,7 +63,8 @@ pub async fn relay(
                 break ExitReason::Shutdown;
             }
 
-            // client -> upstream
+            // client -> upstream: half-close when the client finishes sending so the
+            // upstream can flush its response, but keep the upstream->client leg open.
             r = tokio::time::timeout(idle, ri.read(&mut buf_c)), if c2u_open => match r {
                 Err(_elapsed) => break ExitReason::Idle,
                 Ok(Ok(0)) => { let _ = wu.shutdown().await; c2u_open = false; }
@@ -76,10 +75,11 @@ pub async fn relay(
                 Ok(Err(e)) => break ExitReason::Error(e),
             },
 
-            // upstream -> client
-            r = tokio::time::timeout(idle, ru.read(&mut buf_u)), if u2c_open => match r {
+            // upstream -> client: full teardown the moment the upstream closes so that
+            // idle client connections are not held open until the idle timer fires.
+            r = tokio::time::timeout(idle, ru.read(&mut buf_u)) => match r {
                 Err(_elapsed) => break ExitReason::Idle,
-                Ok(Ok(0)) => { let _ = wi.shutdown().await; u2c_open = false; }
+                Ok(Ok(0)) => { let _ = wi.shutdown().await; break ExitReason::Closed; }
                 Ok(Ok(n)) => match wi.write_all(&buf_u[..n]).await {
                     Ok(()) => tx += n as u64,
                     Err(e) => break ExitReason::Error(e),

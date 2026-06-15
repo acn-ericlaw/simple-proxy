@@ -144,6 +144,74 @@ async fn idle_connection_times_out() {
     assert_eq!(n, 0, "idle connection should be closed (EOF)");
 }
 
+/// Verify that when the upstream server closes the connection the relay
+/// propagates EOF to the idle client promptly — not after the idle timer.
+///
+/// Idle is set to 30 s so any teardown within 5 s must be driven by the
+/// upstream-close path, not the timeout path.
+#[tokio::test]
+async fn upstream_close_propagates_eof_to_idle_client() {
+    // Server: accept one connection, wait briefly, then close it cleanly (FIN).
+    let server_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server_addr = server_listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let (sock, _) = server_listener.accept().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        drop(sock); // OS sends FIN
+    });
+
+    let (proxy_addr, _ctrl, _h) =
+        spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
+
+    let mut client = TcpStream::connect(proxy_addr).await.unwrap();
+
+    // Client is idle. After ~100 ms the server drops — the relay must propagate
+    // the close to the client in well under 5 s.
+    let mut buf = [0u8; 16];
+    let result = tokio::time::timeout(Duration::from_secs(5), client.read(&mut buf)).await;
+
+    match result {
+        Ok(Ok(0)) | Ok(Err(_)) => {} // EOF or RST — both are acceptable
+        Ok(Ok(n)) => panic!("unexpected {n} bytes received after server closed"),
+        Err(_) => panic!(
+            "server close was NOT propagated to the client within 5 s \
+             (relay is holding the connection open — likely waiting for idle timeout)"
+        ),
+    }
+}
+
+/// Server sends data and then closes; the client should receive the data
+/// followed by EOF, not hang waiting for the idle timer.
+#[tokio::test]
+async fn upstream_close_after_data_propagates_to_idle_client() {
+    let server_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server_addr = server_listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let (mut sock, _) = server_listener.accept().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        sock.write_all(b"hello from server").await.unwrap();
+        // Clean close — OS sends FIN after draining the send buffer.
+        drop(sock);
+    });
+
+    let (proxy_addr, _ctrl, _h) =
+        spawn_proxy(server_addr, None, Duration::from_secs(30)).await;
+
+    let mut client = TcpStream::connect(proxy_addr).await.unwrap();
+
+    let mut got = Vec::new();
+    let result =
+        tokio::time::timeout(Duration::from_secs(5), client.read_to_end(&mut got)).await;
+
+    match result {
+        Ok(Ok(_)) => assert_eq!(got, b"hello from server", "data must arrive intact"),
+        Ok(Err(e)) => panic!("unexpected read error: {e}"),
+        Err(_) => panic!(
+            "server close (after sending data) was NOT propagated to the client within 5 s"
+        ),
+    }
+}
+
 #[tokio::test]
 async fn graceful_shutdown_stops_accept_loop() {
     let echo = spawn_echo().await;
