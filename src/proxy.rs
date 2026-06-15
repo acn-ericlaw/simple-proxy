@@ -227,16 +227,57 @@ async fn handle_connection(
     logln!("Remaining connections = {}", conns.load(Ordering::Relaxed));
 }
 
+/// Returns true when a connect timeout to `target` should trigger a process restart.
+/// Extracted so the condition is unit-testable without calling `process::exit`.
+fn should_restart(target: SocketAddr, restart: Option<u16>) -> bool {
+    restart == Some(target.port())
+}
+
 /// If the (timed-out) target equals the configured restart port, exit non-zero so a
 /// process manager (systemd/docker) restarts us. Typed `TimedOut` check replaces the JS
 /// locale-fragile `startsWith("connect ETIMEDOUT")`.
 fn maybe_restart(target: SocketAddr, restart: Option<u16>) {
-    if restart == Some(target.port()) {
+    if should_restart(target, restart) {
         logln!(
             "Stopping application because port-{} does not respond",
             target.port()
         );
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn restart_triggers_on_matching_port() {
+        let target: SocketAddr = "127.0.0.1:8085".parse().unwrap();
+        assert!(should_restart(target, Some(8085)));
+    }
+
+    #[test]
+    fn restart_does_not_trigger_on_wrong_port() {
+        let target: SocketAddr = "127.0.0.1:8085".parse().unwrap();
+        assert!(!should_restart(target, Some(9090)));
+    }
+
+    #[test]
+    fn restart_does_not_trigger_when_unconfigured() {
+        let target: SocketAddr = "127.0.0.1:8085".parse().unwrap();
+        assert!(!should_restart(target, None));
+    }
+
+    #[test]
+    fn conn_guard_increments_and_decrements() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        {
+            let _g1 = ConnGuard::new(&counter);
+            assert_eq!(counter.load(Ordering::Relaxed), 1);
+            let _g2 = ConnGuard::new(&counter);
+            assert_eq!(counter.load(Ordering::Relaxed), 2);
+        } // both guards dropped here
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
     }
 }
 
