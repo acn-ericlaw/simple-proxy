@@ -10,6 +10,11 @@ use std::time::Duration;
 const DEFAULT_IDLE_SECS: u64 = 1800; // 30 minutes, matching the JS IDLE_TIMEOUT
 
 /// One `source_ports[i] -> target:target_ports[i]` daemon configuration.
+///
+/// Marked `#[non_exhaustive]` so new optional fields can be added in future
+/// versions without breaking downstream struct patterns or manual construction.
+/// Use [`Config::from_json`] or [`Config::load`] to construct.
+#[non_exhaustive]
 #[derive(Debug, Deserialize)]
 pub struct Config {
     /// Resolve the target IP at startup by running a shell command. Optional —
@@ -32,6 +37,7 @@ pub struct Config {
     pub idle_timeout_secs: Option<u64>,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Deserialize)]
 pub struct Discovery {
     pub command: String,

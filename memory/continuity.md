@@ -123,7 +123,7 @@
   <!-- id: bp-prove-reliability | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Mature crates/event-bus into a standalone, documented, versioned library with ≥1 real consumer beyond the demo — README expanded, `pipeline` example added (3-stage work-queue pipeline; real architectural consumer). serves: vision-simple-proxy
   <!-- id: bp-event-bus-standalone | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
-- [ ] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks. serves: vision-simple-proxy
+- [x] (blueprint) Define a stable embedding surface (public API + config) so the proxy/event-bus drop into a larger system without forks — `lib.rs` documents stable API vs. binary helpers; `#[non_exhaustive]` added to `ExitReason`, `RelayStats`, `Config`, `Discovery`. serves: vision-simple-proxy
   <!-- id: bp-embedding-surface | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->
 - [x] (blueprint) Add CI gates (cargo test/fmt/clippy) — `.github/workflows/ci.yml` committed; runs on push/PR to main. serves: vision-simple-proxy
   <!-- id: bp-ci-gates | created: 2026-06-14 | last_used: 2026-06-14 | uses: 1 | tier: working | origin: sessions/2026-06-15-044225.md -->

@@ -15,6 +15,10 @@ use tokio::net::TcpStream;
 const BUF_SIZE: usize = 16 * 1024;
 
 /// Why a relay ended. `rx`/`tx` are always reported regardless of reason.
+///
+/// Marked `#[non_exhaustive]` so new variants can be added without breaking
+/// downstream match arms.
+#[non_exhaustive]
 pub enum ExitReason {
     /// Both directions reached EOF (normal close).
     Closed,
@@ -26,10 +30,15 @@ pub enum ExitReason {
     Error(std::io::Error),
 }
 
+/// Statistics returned by [`relay`] describing the completed relay session.
+///
+/// Marked `#[non_exhaustive]` so new fields can be added without breaking
+/// existing struct patterns.
+#[non_exhaustive]
 pub struct RelayStats {
-    /// Bytes client -> upstream (the inbound socket's `bytesRead`).
+    /// Bytes client -> upstream.
     pub rx: u64,
-    /// Bytes upstream -> client (the inbound socket's `bytesWritten`).
+    /// Bytes upstream -> client.
     pub tx: u64,
     pub reason: ExitReason,
 }
