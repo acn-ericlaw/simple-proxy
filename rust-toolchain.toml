@@ -1,0 +1,14 @@
+# Pins the Rust toolchain for local builds AND CI (single source of truth).
+#
+# Why pin: CI previously used a floating `stable` toolchain together with
+# `RUSTFLAGS: -D warnings`. When stable rolled forward (1.95 -> 1.96) it promoted a
+# new clippy lint (`items_after_test_module`) to warn-by-default, which `-D warnings`
+# turned into a hard error — breaking CI with no code change. Pinning makes the build
+# reproducible; bump `channel` deliberately (and re-run fmt/clippy/test) to adopt new
+# compiler/clippy lints.
+#
+# Currently pinned to the latest stable (1.96.0, released 2026-05-28); fmt/clippy
+# (-D warnings)/test all verified green under it on 2026-06-15.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]

@@ -17,10 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      # The toolchain is pinned by rust-toolchain.toml (single source of truth for
+      # local + CI). rustup auto-installs that exact channel and its listed components
+      # (rustfmt, clippy), so a floating `stable` can't reintroduce surprise lint breakage.
+      - name: Install pinned Rust toolchain
+        run: rustup show && rustc --version
 
       - name: Cache cargo registry
         uses: actions/cache@v4

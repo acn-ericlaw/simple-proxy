@@ -246,6 +246,22 @@ fn maybe_restart(target: SocketAddr, restart: Option<u16>) {
     }
 }
 
+/// Increments the live-connection counter on creation, decrements on drop.
+struct ConnGuard<'a>(&'a Arc<AtomicUsize>);
+
+impl<'a> ConnGuard<'a> {
+    fn new(conns: &'a Arc<AtomicUsize>) -> Self {
+        conns.fetch_add(1, Ordering::Relaxed);
+        ConnGuard(conns)
+    }
+}
+
+impl Drop for ConnGuard<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,21 +294,5 @@ mod tests {
             assert_eq!(counter.load(Ordering::Relaxed), 2);
         } // both guards dropped here
         assert_eq!(counter.load(Ordering::Relaxed), 0);
-    }
-}
-
-/// Increments the live-connection counter on creation, decrements on drop.
-struct ConnGuard<'a>(&'a Arc<AtomicUsize>);
-
-impl<'a> ConnGuard<'a> {
-    fn new(conns: &'a Arc<AtomicUsize>) -> Self {
-        conns.fetch_add(1, Ordering::Relaxed);
-        ConnGuard(conns)
-    }
-}
-
-impl Drop for ConnGuard<'_> {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::Relaxed);
     }
 }
