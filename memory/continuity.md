@@ -15,7 +15,7 @@
 - **project:** simple-proxy
 - **status:** Rust + Tokio v2.0.0; now a Cargo workspace (proxy at root + `event-bus` crate under `crates/`); builds/tests green, not yet committed (2026-06-13)
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code)
+- **last_session:** 2026-06-15 (Claude Code) — all Blueprint gaps closed
 - **last_review:** (none yet)
 - **last_invariant_check:** (none yet)
 - **repo:** ~/sandbox/simple-proxy
