@@ -42,10 +42,84 @@ to use it, a procedure, and maybe helper scripts). **This is the runtime:** when
 matches a skill's `description`, read and follow that `SKILL.md` (and any scripts it
 references). The agent is the runtime — no engine required, so this works on any vendor.
 
-Some runtimes also auto-discover a native adapter (`.claude/skills/`, `.gemini/commands/`,
-`.cursor/rules/`); those are thin, regenerated pointers to `agent-skills/` and are personal/
-per-machine (gitignored). The shared source of truth is always `agent-skills/<name>/SKILL.md` —
-edit skills there, never in an adapter. See `.agent/schema.md`.
+### Authoring a skill
+
+To add a skill, create **`agent-skills/<name>/SKILL.md`** (the committed source of truth):
+frontmatter `name` + a sharp `description` (the *when-to-use* trigger), then the procedure;
+put any helper scripts in `agent-skills/<name>/scripts/`. Then run **"sync skill adapters"**
+to generate your vendor's adapter. **Never author a skill directly in a vendor folder**
+(`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`) — those are gitignored, regenerated
+*pointers*; a skill written there won't be shared and isn't the source of truth. (Some
+vendors' built-in skill creators default to their own folder — if that happens, **adopt** it
+into `agent-skills/`; see "Adopt a skill" below.)
+
+### Adapters — optional, local, regenerated
+
+Some runtimes auto-discover a *native* adapter for ergonomic auto-trigger. Adapters are
+**thin pointers** to the neutral skill, **gitignored** (personal/per-machine), and
+**regenerated** — never hand-edited, never a copy. The source of truth is always
+`agent-skills/<name>/SKILL.md`; edit skills there. For each `agent-skills/<name>/SKILL.md`
+(using its `name` + `description`), the adapters are:
+
+- **Claude Code** → `.claude/skills/<name>/SKILL.md`:
+  ```
+  ---
+  name: <name>
+  description: <description>
+  ---
+  Maintained vendor-neutrally. Read and follow `agent-skills/<name>/SKILL.md` (repo root)
+  and any scripts it references.
+  ```
+- **Gemini CLI** → `.gemini/commands/<name>.toml`:
+  ```
+  description = "<description>"
+  prompt = "Read and follow the skill at agent-skills/<name>/SKILL.md (repo root), including any scripts it references, then carry out: {{args}}"
+  ```
+- **Cursor** → `.cursor/rules/<name>.mdc` (the "agent-requested" type — description-matched,
+  so `globs` is empty and `alwaysApply` is false):
+  ```
+  ---
+  description: <description>
+  globs:
+  alwaysApply: false
+  ---
+  When this applies, read and follow `agent-skills/<name>/SKILL.md` (repo root) and any
+  scripts it references.
+  ```
+
+### Sync skill adapters
+
+Adapters are gitignored, so a freshly **cloned or pulled** repo has the neutral skills but
+**no adapters on this machine** — native `/`-commands / auto-trigger won't exist until you
+regenerate them. (The runtime baseline above always works regardless; this is only for
+native ergonomics.) When the user says **"sync skill adapters"** — or after cloning a repo
+that has `agent-skills/` — regenerate them:
+
+1. For **each** `agent-skills/<name>/SKILL.md`, (re)write all three adapters above
+   (idempotent — overwrite the adapter; never touch the neutral skill or its scripts).
+2. **Prune** orphans: remove any *generated adapter* (one whose body points at
+   `agent-skills/<name>/`) whose neutral skill no longer exists, so adapters stay in
+   lockstep. Never delete other files in those vendor dirs.
+3. Report what was regenerated / pruned. This touches no committed file (adapters are
+   gitignored) and is **not** a version change.
+
+### Adopt a skill (vendor → neutral) — the safety net
+
+If a skill was authored natively in a vendor folder (e.g. a built-in skill creator wrote to
+`.claude/skills/<name>/`), it's **stranded** — gitignored and not the source of truth.
+**Adopt it** into the shared layer (the reverse of sync — the same move migration makes at
+enable):
+
+1. Copy its content into `agent-skills/<name>/SKILL.md` — normalize the frontmatter to
+   `name` + `description`; move any bundled scripts to `agent-skills/<name>/scripts/`.
+2. Run **"sync skill adapters"** — regenerates the vendor adapter as a *pointer*, replacing
+   the hand-authored native file (now redundant).
+3. Commit `agent-skills/<name>/`. It is now the shared source of truth; teammates pull + sync.
+
+Run it on demand ("adopt skill `<name>`"), and it is **checked at session close** (see "After
+Every Session") so a natively-authored skill never silently stays unshared.
+
+See `.agent/schema.md` and `docs/DESIGN-skills-layer.md`.
 
 ## During the Session
 
@@ -89,16 +163,23 @@ expected (the decay math counts log files — `DECAY.md` §4).
      `superseded-by: <new>` (omit the link for pure invalidation), and record
      `Superseded: <old> → <new>` in `## Memory References`. This is a truth-state edit
      you own; the review archives it flagged "superseded" (`DECAY.md` §9).
-3. **Review cadence.** If `sessions_since_last_review ≥ review_every`
+3. **Skills safety check** (if `agent-skills/` exists or you authored a skill). Did a skill
+   land in a **vendor folder** (`.claude/skills/<name>/`, `.gemini/commands/<name>.toml`,
+   `.cursor/rules/<name>.mdc`) with **no matching `agent-skills/<name>/`**? If so it is
+   stranded (gitignored, unshared) — **adopt it** before committing: promote it into
+   `agent-skills/<name>/SKILL.md`, then "sync skill adapters" (see "Skills" → "Adopt a
+   skill"). If nothing was authored in a vendor folder, this is a no-op.
+4. **Review cadence.** If `sessions_since_last_review ≥ review_every`
    (`memory/decay-policy.md`), or `continuity.md` has grown past
    `continuity_max_lines`, run the review ritual now — see `REVIEW.md`. (Also run it
    on demand if the user says "review memory".)
-4. Remind the user: `git add memory/ && git commit -m "session YYYY-MM-DD [agent]"`
+5. Remind the user: `git add memory/ && git commit -m "session YYYY-MM-DD [agent]"`
 
 **After-session checklist** (the ritual is convention — run it each time):
 - [ ] session log written (persist-time filename + `## Memory References`)
 - [ ] `continuity.md`: `last_session` set, threads checked, new facts have footers
 - [ ] review run if cadence/size triggered (`REVIEW.md`)
+- [ ] skills safety check — any skill authored in a vendor folder adopted into `agent-skills/`?
 - [ ] reminded the user to commit `memory/`
 
 > Optional reinforcement: wire a lightweight Stop or pre-commit hook in your runtime

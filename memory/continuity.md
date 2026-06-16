@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — dropped the `hello-world` portable skill (`agent-skills/hello-world/` + bundled `scripts/hello.sh`; 3 gitignored adapters) to test the skills layer cross-machine via Gemini CLI; ran it locally (greeting + local/UTC time). Earlier same day: tooling upgrade agent-memory v4.0.0 → v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo` + CI/toolchain + Vision re-horizon to `vision-event-bus`.
+- **last_session:** 2026-06-16 (Claude Code) — tooling upgrade: agent-memory v4.1.1 → v4.3.0 (sync skill adapters + skill authoring convention + "adopt skill" safety-net; re-synced AGENTS.md + .agent/schema.md, stamped). No skills to migrate/adopt (hello-world already neutral). Earlier same day: dropped `hello-world` skill (cross-machine Gemini test) + upgrade v4.0.0→v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo` + Vision re-horizon to `vision-event-bus`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
