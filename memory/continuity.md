@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — bumped agent-memory v4.3.0 → **v4.3.1** (re-synced AGENTS.md doc fixes + stamped `.agent/version.md`); ran a full **skill-lifecycle sanity check** here — git split / pointer integrity / per-vendor format / adopt / prune all **PASS**, but surfaced two `description`-drift hazards in the tool's recipe (special chars + neutral↔adapter mismatch) flagged for a tool-side fix. Earlier same day: test-drove the v4.3.0 session-close safety check; v4.1.1→v4.3.0; dropped `hello-world` skill; v4.0.0→v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo`.
+- **last_session:** 2026-06-16 (Claude Code) — bumped agent-memory v4.3.1 → **v4.3.2** (the tool-side fix for the two `description` hazards the sanity check found): re-synced AGENTS.md, de-quoted `hello-world`'s `description` + regenerated its adapters to mirror it verbatim (Gemini TOML now valid), stamped `.agent/version.md`. Earlier same day: v4.3.0→4.3.1 + the skill-lifecycle sanity check; session-close safety-check test-drive; v4.1.1→v4.3.0; dropped `hello-world`. Prior (2026-06-15): `bp-eb-proxy-signaling-demo`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
