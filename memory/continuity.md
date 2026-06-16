@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — bumped agent-memory v4.3.2 → **v4.3.3** (skill description guidance: concise + trigger-rich; `>`/`|` YAML-only): re-synced AGENTS.md, tightened `hello-world`'s `description` (~35 words) + regenerated its adapters, stamped `.agent/version.md`. Earlier same day: v4.3.1→4.3.2 (description hardening) + the skill-lifecycle sanity check; v4.3.0→4.3.1; session-close safety-check test-drive; v4.1.1→v4.3.0. Prior (2026-06-15): `bp-eb-proxy-signaling-demo`.
+- **last_session:** 2026-06-16 (Claude Code) — bumped agent-memory v4.3.3 → **v4.4.0** (lightweight skills): re-synced slim AGENTS.md (skill recipe/ops + per-session safety check removed), installed on-demand `SKILLS.md`, stamped `.agent/version.md`; lightweight skills-adapter check = in sync. Earlier same day: v4.3.x description hardening/guidance + skill-lifecycle sanity check; v4.1.1→v4.3.0 + session-close test-drive. Prior (2026-06-15): `bp-eb-proxy-signaling-demo`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
