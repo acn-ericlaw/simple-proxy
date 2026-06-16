@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — tooling upgrade: agent-memory v4.1.1 → v4.3.0 (sync skill adapters + skill authoring convention + "adopt skill" safety-net; re-synced AGENTS.md + .agent/schema.md, stamped). No skills to migrate/adopt (hello-world already neutral). Earlier same day: dropped `hello-world` skill (cross-machine Gemini test) + upgrade v4.0.0→v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo` + Vision re-horizon to `vision-event-bus`.
+- **last_session:** 2026-06-16 (Claude Code) — **test-drove the v4.3.0 session-close skills safety check**: authored a throwaway skill in `.claude/skills/session-close-demo/` (bypassing convention), the safety check flagged it stranded, and **adopt** resolved it (promoted to `agent-skills/session-close-demo/SKILL.md` + re-synced all 3 adapters; neutral tracked, adapters gitignored). Throwaway fixture — removable after review. Earlier same day: tooling upgrade agent-memory v4.1.1 → v4.3.0; dropped `hello-world` skill + upgrade v4.0.0→v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo` + Vision re-horizon to `vision-event-bus`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
@@ -135,6 +135,16 @@
   portability with zero committed Gemini files). For the `/hello-world` slash command,
   regenerate the Gemini adapter there first (adapters are per-machine).
   <!-- id: ot-skill-crossmachine-test | created: 2026-06-16 | last_used: 2026-06-16 | uses: 1 | tier: working | origin: 2026-06-16-170420 -->
+
+- [x] (skills-layer test) Test-drove the **v4.3.0 session-close skills safety check**. A skill
+  authored natively in `.claude/skills/session-close-demo/` (no matching `agent-skills/`) was
+  correctly detected as **stranded** at session close and **adopted**: promoted to the neutral
+  `agent-skills/session-close-demo/SKILL.md` + "sync skill adapters" regenerated all three
+  adapters as pointers (the hand-authored Claude file replaced). Verified: neutral skill TRACKED
+  (only path `git status` shows), all three adapters IGNORED (`.gitignore` `.claude/`/`.gemini/`/
+  `.cursor/`) — they don't travel. `session-close-demo` was a **throwaway fixture**, **removed
+  after the test** (the safety check + adopt are verified; this session log is the record).
+  <!-- id: ot-session-close-safety-check-verified | created: 2026-06-16 | last_used: 2026-06-16 | uses: 1 | tier: working | origin: sessions/2026-06-16-182943.md -->
 
 - [x] (blueprint / human gate) The `vision-simple-proxy` gap closed (all five gaps `[x]`).
   **Resolved 2026-06-15:** the maintainer confirmed that Vision **realized** and chose to
