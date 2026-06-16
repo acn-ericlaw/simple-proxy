@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-15 (Claude Code) — implemented `bp-eb-proxy-signaling-demo`: a `ConnObserver` control-plane hook + the `event_bus_signaling` worked example (event-bus as dev-dep; binary stays flume-free). 50 tests green. (Earlier same day: CI fix + toolchain pin; Vision re-horizon to `vision-event-bus`.)
+- **last_session:** 2026-06-16 (Claude Code) — tooling upgrade: agent-memory v4.0.0 → v4.1.1 (cross-vendor skills layer; re-synced AGENTS.md + .agent/schema.md, stamped version; no skills to migrate). Prior (2026-06-15): implemented `bp-eb-proxy-signaling-demo` (`ConnObserver` hook + `event_bus_signaling` example; 50 tests green); CI fix + toolchain pin; Vision re-horizon to `vision-event-bus`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
