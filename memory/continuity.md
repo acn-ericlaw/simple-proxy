@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — tooling upgrade: agent-memory v4.0.0 → v4.1.1 (cross-vendor skills layer; re-synced AGENTS.md + .agent/schema.md, stamped version; no skills to migrate). Prior (2026-06-15): implemented `bp-eb-proxy-signaling-demo` (`ConnObserver` hook + `event_bus_signaling` example; 50 tests green); CI fix + toolchain pin; Vision re-horizon to `vision-event-bus`.
+- **last_session:** 2026-06-16 (Claude Code) — dropped the `hello-world` portable skill (`agent-skills/hello-world/` + bundled `scripts/hello.sh`; 3 gitignored adapters) to test the skills layer cross-machine via Gemini CLI; ran it locally (greeting + local/UTC time). Earlier same day: tooling upgrade agent-memory v4.0.0 → v4.1.1. Prior (2026-06-15): `bp-eb-proxy-signaling-demo` + CI/toolchain + Vision re-horizon to `vision-event-bus`.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
@@ -126,6 +126,15 @@
   <!-- id: ci-toolchain-pinned | created: 2026-06-15 | last_used: 2026-06-15 | uses: 1 | tier: working | origin: sessions/2026-06-15-183705.md -->
 
 ## Open Threads
+
+- [ ] (skills-layer test) Verify the `hello-world` portable skill on a **different machine via
+  Gemini CLI** (maintainer, pending). The neutral `agent-skills/hello-world/SKILL.md` travels
+  via git; the per-vendor adapters (`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`)
+  are **gitignored** and do NOT travel. So on the other machine: ask Gemini "run hello world"
+  → the `GEMINI.md`→`AGENTS.md` **baseline** reads the neutral skill (proves vendor-neutral
+  portability with zero committed Gemini files). For the `/hello-world` slash command,
+  regenerate the Gemini adapter there first (adapters are per-machine).
+  <!-- id: ot-skill-crossmachine-test | created: 2026-06-16 | last_used: 2026-06-16 | uses: 1 | tier: working | origin: 2026-06-16-170420 -->
 
 - [x] (blueprint / human gate) The `vision-simple-proxy` gap closed (all five gaps `[x]`).
   **Resolved 2026-06-15:** the maintainer confirmed that Vision **realized** and chose to
