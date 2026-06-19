@@ -41,8 +41,9 @@ vendor-neutral `agent-skills/<name>/SKILL.md` files. **This is the runtime:** wh
 matches a skill's `description`, read and follow that `SKILL.md` (and any scripts it
 references). The agent is the runtime — works on any vendor, no engine.
 
-Per-vendor adapters (`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`) are thin,
-gitignored, regenerated pointers; the source of truth is always `agent-skills/<name>/SKILL.md`.
+Per-vendor adapters (`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`, `.kiro/skills/`)
+are thin, gitignored, regenerated pointers — **never commit them** (only `agent-skills/` is
+shared); the source of truth is always `agent-skills/<name>/SKILL.md`.
 
 **Authoring, syncing, adopting, or sanity-checking a skill?** See **`SKILLS.md`** (read on
 demand — it is *not* part of this per-session read). Skill work is a deliberate, occasional
@@ -94,13 +95,34 @@ expected (the decay math counts log files — `DECAY.md` §4).
    (`memory/decay-policy.md`), or `continuity.md` has grown past
    `continuity_max_lines`, run the review ritual now — see `REVIEW.md`. (Also run it
    on demand if the user says "review memory".)
-4. Remind the user: `git add memory/ && git commit -m "session YYYY-MM-DD [agent]"`
+4. Remind the user: `git add memory/ && git commit -m "session YYYY-MM-DD [agent]"`.
+   **Commits are deliberate and human-initiated.** When you commit at the human's direction,
+   **identify yourself** the same way you do in session logs — e.g. a `Co-Authored-By: <your agent
+   name>` trailer — so authorship is traceable across vendors. (If your runtime already adds one,
+   nothing to do.)
 
 **After-session checklist** (the ritual is convention — run it each time):
 - [ ] session log written (persist-time filename + `## Memory References`)
 - [ ] `continuity.md`: `last_session` set, threads checked, new facts have footers
 - [ ] review run if cadence/size triggered (`REVIEW.md`)
-- [ ] reminded the user to commit `memory/`
+- [ ] reminded the user to commit `memory/` (deliberate, human-initiated, with a self-identifying co-author trailer)
+
+> **Lightweight mode — key the write to whether a *tracked* file changed (the *objective* test is the
+> git diff, not any filesystem write — and never a "trivial" judgment; both AI and human misjudge "trivial").**
+> - **Read-only session** (no tracked file changed — orientation, Q&A, exploration, **or a run whose
+>   only writes are gitignored, regenerated artifacts**: `sync skill adapters`, `review-scratch/`
+>   snapshots, the compiled lint artifact): **no session log** — nothing entered the repo, nothing to
+>   commit, no event to record.
+> - **A tracked file changed but produced no memory-relevant event** (no new/changed fact, no decision
+>   worth recording, no Open Thread touched, no project-state change — e.g. a one-line fix, a typo):
+>   write a **one-line "lite" session log** (persist-time filename + `**Agent:**` + a *lightweight*-marked
+>   summary + `## Memory References` → `(none)`) and skip the rest (full template, fact-footers,
+>   continuity edits; `last_session` is derivable from the newest session file). **Don't skip the log
+>   just because it felt "trivial"** — a misjudged change that actually mattered must still be logged.
+> - **A memory-relevant event** (fact / decision / Open Thread / project-state change, or anything
+>   touching Vision / Blueprint / invariant / supersession): the **full** ritual.
+> The ledger stays continuous for anything that touched a *tracked* file; the review treats a lite log
+> as a normal reference-free session, so usage is unaffected.
 
 > Optional reinforcement: wire a lightweight Stop or pre-commit hook in your runtime
 > so this ritual is *prompted*, not merely documented. It stays optional — the

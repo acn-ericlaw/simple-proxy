@@ -46,7 +46,10 @@ drifts). For each `agent-skills/<name>/SKILL.md` (using its `name` + `descriptio
   Maintained vendor-neutrally. Read and follow `agent-skills/<name>/SKILL.md` (repo root)
   and any scripts it references.
   ```
-- **Gemini CLI** → `.gemini/commands/<name>.toml`:
+- **Gemini CLI** → `.gemini/commands/<name>.toml` (a **slash command** — invoked explicitly as
+  `/<name>`; Gemini does **not** auto-match commands against natural language, so a phrase like
+  "run <name>" routes through the `AGENTS.md` baseline instead — which reads the *same* neutral
+  skill, so the result is identical):
   ```
   description = "<description>"
   prompt = "Read and follow the skill at agent-skills/<name>/SKILL.md (repo root), including any scripts it references, then carry out: {{args}}"
@@ -62,6 +65,25 @@ drifts). For each `agent-skills/<name>/SKILL.md` (using its `name` + `descriptio
   When this applies, read and follow `agent-skills/<name>/SKILL.md` (repo root) and any
   scripts it references.
   ```
+- **Kiro** → `.kiro/skills/<name>/SKILL.md` (Kiro follows the open Agent Skills standard, so
+  this is the **same shape as the Claude adapter** — workspace skills live under `.kiro/skills/`):
+  ```
+  ---
+  name: <name>
+  description: <description>
+  ---
+  Maintained vendor-neutrally. Read and follow `agent-skills/<name>/SKILL.md` (repo root)
+  and any scripts it references.
+  ```
+
+**Trigger semantics differ per vendor — set expectations accordingly.** Claude / Cursor / Kiro
+adapters are *description-matched* — they auto-fire when a natural-language request matches the
+`description`. The **Gemini** adapter is a *slash command* — it fires only on an explicit
+`/<name>`, never on a natural-language phrase. This is **not** drift or a missing adapter: every
+adapter is a thin pointer back to the **same** `agent-skills/<name>/SKILL.md`, and the
+`AGENTS.md` baseline runs that neutral skill on any vendor regardless. So "checks `agent-skills/`
+first" for a natural-language request on Gemini is *correct* — the baseline and the slash command
+land on the identical file. Don't expect Gemini to auto-trigger a command from prose.
 
 Keep descriptions single-line and free of `"` so they embed safely into TOML / `.mdc` / YAML
 frontmatter; if a `"` is unavoidable, escape it for the target format (TOML: a single-quoted
@@ -72,11 +94,17 @@ literal string; `.mdc`/YAML: quote the whole value). YAML `>`/`|` folded/literal
 ## Operations
 
 ### `sync skill adapters`
-For **each** `agent-skills/<name>/SKILL.md`, (re)write the three adapters above — idempotent;
+For **each** `agent-skills/<name>/SKILL.md`, (re)write the four adapters above — idempotent;
 overwrite the adapter, never the neutral skill — and **prune** orphaned *generated* adapters
 (one whose `agent-skills/<name>/` no longer exists; never touch other files in a vendor dir).
 Touches no committed file (adapters are gitignored); not a version change. Run it after
 authoring/editing a skill, or after a clone/pull on a machine that wants native auto-trigger.
+
+> **Never commit the adapters — and never tell the user to.** The vendor adapter dirs
+> (`.claude/`, `.gemini/`, `.cursor/`, `.kiro/`) are gitignored, per-machine, and regenerated;
+> the **only** committed skills artifact is the neutral `agent-skills/`. After a sync, do **not**
+> `git add` an adapter dir or suggest the user commit one. Report it like: *"regenerated N local
+> adapters (gitignored — do not commit; only `agent-skills/` is shared)."*
 
 ### `adopt skill` (vendor → neutral)
 If a skill was authored natively in a vendor folder (e.g. a vendor's built-in skill creator

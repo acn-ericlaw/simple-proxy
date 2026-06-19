@@ -5,8 +5,9 @@
 # are committed and shared across the team, so do NOT ignore them. Only personal
 # AI-IDE runtime directories and local history/caches are ignored below (the
 # "infrastructure", not the steering). The vendor dirs below also hold per-machine
-# skill *adapters* (.claude/skills/, .gemini/commands/, .cursor/rules/) regenerated
-# from agent-skills/ — local only; the neutral agent-skills/ is the shared source of truth.
+# skill *adapters* (.claude/skills/, .gemini/commands/, .cursor/rules/, .kiro/skills/)
+# regenerated from agent-skills/ — local only; the neutral agent-skills/ is the shared
+# source of truth.
 .kiro/
 .claude/
 .cursor/
@@ -21,6 +22,15 @@
 .aider.chat.history.md
 .aider.input.history
 .aider.tags.cache*
+
+# Fresh-context review scratch (second-opinion / apply-critique skills) — personal,
+# per-machine snapshots & critiques; sharing one is a conscious human decision, never committed.
+review-scratch/
+
+# Python bytecode cache — the bundled memory-lint helper script generates this on run;
+# it is a build artifact, never committed (the .py source under agent-skills/ stays tracked).
+__pycache__/
+*.py[cod]
 
 # === Rust ===
 # Build artifacts. Cargo.lock is intentionally committed (this is an application).
