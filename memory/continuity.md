@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-16 (Claude Code) — bumped agent-memory v4.3.3 → **v4.4.0** (lightweight skills): re-synced slim AGENTS.md (skill recipe/ops + per-session safety check removed), installed on-demand `SKILLS.md`, stamped `.agent/version.md`; lightweight skills-adapter check = in sync. Earlier same day: v4.3.x description hardening/guidance + skill-lifecycle sanity check; v4.1.1→v4.3.0 + session-close test-drive. Prior (2026-06-15): `bp-eb-proxy-signaling-demo`.
+- **last_session:** 2026-06-19 (Gemini CLI) — test-drove the system skill overwrite guardrail on memory-lint skill. Prior (2026-06-16): bumped agent-memory v4.3.3 → v4.4.0 (lightweight skills).
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
