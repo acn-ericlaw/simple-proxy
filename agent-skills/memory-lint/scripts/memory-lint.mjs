@@ -132,7 +132,7 @@ function parse_args(args) {
   return { strict, root_arg };
 }
 
-function load_repo(root) {
+export function load_repo(root) {
   // Read the memory/ layer. Returns { cont, pinned, arch, extra, sessions, refs }.
   const mem = join(root, "memory");
   const cont_text = read_text(join(mem, "continuity.md"));
@@ -215,7 +215,7 @@ function check_overdue(cont, pinned, sslu, aw) {
   return out;
 }
 
-function check_dangling(allf) {
+export function check_dangling(allf) {
   // (4) supersession links resolve
   const out = [];
   for (const [fid, fields] of allf) {
