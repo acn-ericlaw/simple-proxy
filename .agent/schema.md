@@ -190,6 +190,39 @@ broken link is drift, and it's grep-detectable.
 
 ---
 
+## docs/ADR.md  (optional — human-facing governance, on-demand)
+
+An **optional** Architecture Decision Record log: a human-facing ledger of significant,
+durable architecture decisions, one per entry, at the VBDI **Design** altitude. It lives
+under `docs/` so a human (IT governance, a newcomer, an auditor) can find it, and is read
+**on demand** — it is **never added to the per-session read path** (zero default token cost,
+like `docs/DESIGN-*.md`). Not auto-installed; adopt it only if the team wants one.
+
+**Map, don't duplicate.** Live constraints stay in `continuity.md`
+(`## Architectural Invariants` / `## Key Decisions`) — the *what* that holds *now*, with an
+`id`. An ADR is the durable *why* (context, alternatives, consequences). They cross-link:
+`formalizes: <continuity-id>` on the ADR ↔ a visible **`(ADR-NNNN)` tag in the invariant's
+title** (e.g. `Target-repo scope only (ADR-0001)`). That tag is a **pointer for humans** — it
+is **not** a cue for the agent to open `docs/ADR.md`; the constraint text in `continuity.md`
+stays authoritative and is read every session, the ADR is read on demand only. The constraint
+text is never restated as competing truth.
+
+```
+## ADR-NNNN — <Title>
+**Status:** Accepted · **Date:** YYYY-MM-DDThh:mm:ss.mmmZ · **Serves:** <vision-id>
+<!-- id: adr-NNNN | status: accepted | formalizes: <continuity-id> -->
+
+**Abstract.** What was decided + scope.
+**Rationale.** Why, alternatives, and the consequences/trade-offs accepted.
+```
+
+Status: `Proposed → Accepted → Superseded / Deprecated`. **Never deleted** — a decision that
+no longer holds is superseded (replaced by a newer ADR) or deprecated (no longer relevant),
+its entry left in place with `Status` updated (mirrors `DECAY.md` §9). Numbering is monotonic;
+entries are listed **newest first**.
+
+---
+
 ## memory/archive/
 
 Cold storage for archived facts and swept completed threads. Nothing here is

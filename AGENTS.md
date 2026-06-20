@@ -34,6 +34,11 @@ and to the Design it realizes — so intent is traceable and drift is detectable
 altitude transition (confirming the Vision, opening or closing a gap) is a **human
 gate**: propose, then let the human approve. Never fabricate the Vision.
 
+The Design altitude *may* keep an **optional** Architecture Decision Record log,
+`docs/ADR.md` — a human-facing governance ledger of durable architecture decisions
+(see `.agent/schema.md`). It is read **on demand**, **not** part of the per-session read;
+any `(ADR-NNNN)` tag on an invariant is a human pointer, not a cue to open it.
+
 ## Skills
 
 If an `agent-skills/` directory exists, it holds the project's **capabilities** — committed,
