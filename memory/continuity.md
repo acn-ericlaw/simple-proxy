@@ -22,7 +22,7 @@
   control-plane lifecycle events onto the bus via a no-op-by-default `ConnObserver` hook
   (`conn-observer-hook`); event-bus stays a dev-dependency so the binary is flume-free. event-bus is v0.1.0 today.
 - **last_enabled:** 2026-06-13
-- **last_session:** 2026-06-19 (Gemini CLI) — test-drove the system skill overwrite guardrail on memory-lint skill. Prior (2026-06-16): bumped agent-memory v4.3.3 → v4.4.0 (lightweight skills).
+- **last_session:** 2026-06-24 (GitHub Copilot) — drafted feedback note on agent-memory protocol skills experience. Prior (2026-06-24): recreated the greeting skill and synced adapters.
 - **last_review:** 2026-06-15 (through 2026-06-15-172641.md)
 - **last_invariant_check:** (none yet) — not due (10 session files < verify_invariants_every 20)
 - **repo:** ~/sandbox/simple-proxy
@@ -57,6 +57,10 @@
 
 ## Key Decisions
 
+- Created a new demo skill `greeting` that prints a friendly greeting message and local time, using the `$USER` environment variable. (Deleted)
+  <!-- id: skill-greeting | created: 2026-06-24 | last_used: 2026-06-24 | uses: 1 | tier: superseded | origin: sessions/2026-06-24-162539.md -->
+- Recreated the `greeting` skill with time-appropriate messaging (morning, afternoon, evening, night) using the `$USER` environment variable.
+  <!-- id: skill-greeting-v2 | created: 2026-06-24 | last_used: 2026-06-24 | uses: 1 | tier: working | origin: sessions/2026-06-24-170937.md -->
 - One binary, two subcommands: `serve` (config file, optional shell-command target-IP
   discovery OR static `target_ip`, multiple port pairs, IP allow-list, restart-on-dead-
   target) vs. `forward` (CLI args, one static pair, no allow-list — local-dev convenience).

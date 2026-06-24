@@ -35,9 +35,14 @@ altitude transition (confirming the Vision, opening or closing a gap) is a **hum
 gate**: propose, then let the human approve. Never fabricate the Vision.
 
 The Design altitude *may* keep an **optional** Architecture Decision Record log,
-`docs/ADR.md` — a human-facing governance ledger of durable architecture decisions
+`docs/arch-decisions/ADR.md` — a human-facing governance ledger of durable architecture decisions
 (see `.agent/schema.md`). It is read **on demand**, **not** part of the per-session read;
 any `(ADR-NNNN)` tag on an invariant is a human pointer, not a cue to open it.
+**If the log exists, keep it alive:** when you make a new durable architecture decision, or
+supersede/invalidate a continuity fact carrying an `(ADR-NNNN)` tag, **propose** a matching
+ledger update — add a newer ADR, mark the old one `Superseded`/`Deprecated` (never delete),
+keep `formalizes:` ↔ `(ADR-NNNN)` in sync — and let the human approve (a Design-altitude change
+is a human gate; `DECAY.md` §9, §12). That supersession is the one time you open the ledger.
 
 ## Skills
 
@@ -46,13 +51,15 @@ vendor-neutral `agent-skills/<name>/SKILL.md` files. **This is the runtime:** wh
 matches a skill's `description`, read and follow that `SKILL.md` (and any scripts it
 references). The agent is the runtime — works on any vendor, no engine.
 
-Per-vendor adapters (`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`, `.kiro/skills/`)
-are thin, gitignored, regenerated pointers — **never commit them** (only `agent-skills/` is
-shared); the source of truth is always `agent-skills/<name>/SKILL.md`.
+Per-vendor adapters (`.claude/skills/`, `.gemini/commands/`, `.cursor/rules/`, `.kiro/skills/`,
+`.github/skills/`) are thin, gitignored, regenerated pointers — **never commit them** (only
+`agent-skills/` is shared); the source of truth is always `agent-skills/<name>/SKILL.md`.
 
 **Authoring, syncing, adopting, sanity-checking, or editing a tool-provided skill?** See **`SKILLS.md`**
-(read on demand — it is *not* part of this per-session read). Skill work is a deliberate, occasional
-action, never part of the session ritual. A skill whose frontmatter says `provenance: agent-memory-builtin`
+(read on demand — it is *not* part of this per-session read). **Authoring a skill is a 3-step action —
+write `agent-skills/<name>/SKILL.md`, run `sync skill adapters`, then reload your runtime if it loads
+adapters at startup (e.g. GitHub Copilot CLI `/restart`); it is not done after step 1.** Skill work is
+a deliberate, occasional action, never part of the session ritual. A skill whose frontmatter says `provenance: agent-memory-builtin`
 is **tool-managed** (overwritten on upgrade) — don't edit it in place; fork it under a new name, or
 upstream a genuine fix to the agent-memory project (`SKILLS.md` → "Tool-provided (system) skills").
 
@@ -72,8 +79,10 @@ whole conversation. A long, multi-task conversation may produce several logs; th
 expected (the decay math counts log files — `DECAY.md` §4).
 
 1. **Create** `memory/sessions/YYYY-MM-DD-HHMMSS.md` using the UTC timestamp at
-   **persist time** (when you write the file). Use `date -u +%Y-%m-%d-%H%M%S` or
-   equivalent; omit colons for cross-platform compatibility. Title line:
+   **persist time** (when you write the file). **Always run `date -u +%Y-%m-%d-%H%M%S`
+   to get the filename** — the `currentDate` injected into your context is date-only
+   and produces a non-conforming `YYYY-MM-DD.md` name if used directly. Omit colons
+   for cross-platform compatibility. Title line:
    `# Session (endZ)` — the persist-time UTC stamp (full ISO 8601 ms) is required; a
    start time is optional/best-effort, so don't fabricate one. Never append to
    another contributor's session file.
@@ -109,7 +118,7 @@ expected (the decay math counts log files — `DECAY.md` §4).
    nothing to do.)
 
 **After-session checklist** (the ritual is convention — run it each time):
-- [ ] session log written (persist-time filename + `## Memory References`)
+- [ ] session log written — ran `date -u +%Y-%m-%d-%H%M%S` for the filename (not `currentDate`); includes `## Memory References`
 - [ ] `continuity.md`: `last_session` set, threads checked, new facts have footers
 - [ ] review run if cadence/size triggered (`REVIEW.md`)
 - [ ] reminded the user to commit `memory/` (deliberate, human-initiated, with a self-identifying co-author trailer)
