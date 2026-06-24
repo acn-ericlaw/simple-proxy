@@ -148,11 +148,13 @@ literal string; `.mdc`/YAML: quote the whole value). YAML `>`/`|` folded/literal
 
 ### `sync skill adapters`
 **This operation is a runnable script (v4.18.0) — run it; do not hand-write the adapter files or hunt
-for an npm/MCP command.** From the repo root (either runtime — output is byte-identical):
+for an npm/MCP command.** From the repo root (output is byte-identical across all three; **bash needs no
+runtime install — prefer it**, especially in a non-Node project):
 
 ```
+bash agent-skills/sync-adapters/scripts/sync-adapters.sh
+# no bash? (e.g. native Windows) — use whichever runtime you have:
 node agent-skills/sync-adapters/scripts/sync-adapters.mjs
-# or
 python3 agent-skills/sync-adapters/scripts/sync-adapters.py
 ```
 
